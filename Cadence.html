@@ -1785,9 +1785,21 @@ const SCREENS = [
   { id:'ourlist',   label:'Our Lists',       comp: OurListsScreen },
 ];
 
+const HASH_ALIASES = { lists: 'ourlist' };
+const hashToIdx = () => {
+  try {
+    const raw = window.location.hash.replace('#', '').toLowerCase();
+    const id = HASH_ALIASES[raw] || raw;
+    const i = SCREENS.findIndex(s => s.id === id);
+    return i >= 0 ? i : null;
+  } catch { return null; }
+};
+
 const App = () => {
   const [ready, setReady] = useState(false);
   const [idx, setIdx] = useState(() => {
+    const fromHash = hashToIdx();
+    if (fromHash !== null) return fromHash;
     try { return parseInt(localStorage.getItem('moneydate_screen') || '0', 10); } catch { return 0; }
   });
   const [prepMode, setPrepMode] = useState(false);
@@ -1798,7 +1810,21 @@ const App = () => {
       .catch(err => { console.error('Supabase init failed:', err); setReady(true); });
   }, []);
 
-  const go = (n) => { const c = Math.max(0, Math.min(SCREENS.length-1, n)); setIdx(c); localStorage.setItem('moneydate_screen', c); };
+  useEffect(() => {
+    const onHashChange = () => {
+      const i = hashToIdx();
+      if (i !== null) { setIdx(i); localStorage.setItem('moneydate_screen', i); }
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  const go = (n) => {
+    const c = Math.max(0, Math.min(SCREENS.length-1, n));
+    setIdx(c);
+    localStorage.setItem('moneydate_screen', c);
+    window.location.hash = SCREENS[c].id;
+  };
   const S = SCREENS[idx];
   const isHome = idx === 0;
 
