@@ -14,7 +14,7 @@
 
 **Ask before assuming:** If a request contradicts something in DECISIONS.md, surface it. "Are we pivoting?" is always the right question.
 
-**Token discipline:** Do not read files speculatively. Ask for the specific file if unsure. The app is ~2,000 lines — don't load it unless the task requires it.
+**Token discipline:** Do not read files speculatively. Ask for the specific file if unsure. The app is ~2,100 lines — don't load it unless the task requires it.
 
 ---
 
