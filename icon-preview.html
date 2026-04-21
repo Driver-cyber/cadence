@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,700&family=Outfit:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      background: #E8E3DB;
+      font-family: 'Outfit', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 40px;
+      padding: 48px;
+    }
+    h1 { font-size: 15px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #888; margin: 0; }
+    .row { display: flex; gap: 36px; align-items: flex-end; flex-wrap: wrap; justify-content: center; }
+    .option { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+    .sizes { display: flex; gap: 16px; align-items: flex-end; }
+    .icon-wrap {
+      border-radius: 22.5%;
+      overflow: hidden;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.28);
+      display: block;
+      flex-shrink: 0;
+    }
+    .label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #666;
+      text-align: center;
+      line-height: 1.5;
+    }
+    .label strong { display: block; font-size: 14px; color: #1C1C1E; font-weight: 800; }
+    .note { font-size: 11px; color: #999; font-style: italic; max-width: 320px; text-align: center; }
+  </style>
+</head>
+<body>
+
+<h1>Cadence Icon Options</h1>
+<p class="note">Left = 60px (actual phone size) · Right = 120px (detail view) · iOS rounds corners automatically</p>
+
+<div class="row">
+
+  <!-- ── A: Current ─────────────────────────────────── -->
+  <div class="option">
+    <div class="sizes">
+      <div class="icon-wrap" style="width:60px;height:60px">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="60" height="60">
+          <defs><linearGradient id="gA" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#173528"/><stop offset="100%" stop-color="#2A8B68"/>
+          </linearGradient></defs>
+          <rect width="100" height="100" fill="url(#gA)"/>
+          <circle cx="50" cy="50" r="29" fill="none" stroke="#FAF7F2" stroke-width="15"
+            stroke-dasharray="123.6 58.6" transform="rotate(58 50 50)"/>
+          <circle cx="65.4" cy="74.6" r="4.2" fill="#C07A12"/>
+          <circle cx="65.4" cy="25.4" r="4.2" fill="#C07A12"/>
+        </svg>
+      </div>
+      <div class="icon-wrap" style="width:120px;height:120px">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="120" height="120">
+          <defs><linearGradient id="gA2" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#173528"/><stop offset="100%" stop-color="#2A8B68"/>
+          </linearGradient></defs>
+          <rect width="100" height="100" fill="url(#gA2)"/>
+          <circle cx="50" cy="50" r="29" fill="none" stroke="#FAF7F2" stroke-width="15"
+            stroke-dasharray="123.6 58.6" transform="rotate(58 50 50)"/>
+          <circle cx="65.4" cy="74.6" r="4.2" fill="#C07A12"/>
+          <circle cx="65.4" cy="25.4" r="4.2" fill="#C07A12"/>
+        </svg>
+      </div>
+    </div>
+    <div class="label"><strong>A — Current</strong>Geometric ring, amber dots</div>
+  </div>
+
+  <!-- ── B: Serif C, dark bg ────────────────────────── -->
+  <div class="option">
+    <div class="sizes">
+      <div class="icon-wrap" style="width:60px;height:60px">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="60" height="60">
+          <defs><linearGradient id="gB" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#173528"/><stop offset="100%" stop-color="#265842"/>
+          </linearGradient></defs>
+          <rect width="100" height="100" fill="url(#gB)"/>
+          <text x="50" y="70" text-anchor="middle"
+            font-family="'Playfair Display', Georgia, serif"
+            font-size="76" font-weight="700" font-style="italic"
+            fill="#FAF7F2" opacity="0.97">C</text>
+          <circle cx="71" cy="78" r="3.8" fill="#C07A12"/>
+        </svg>
+      </div>
+      <div class="icon-wrap" style="width:120px;height:120px">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="120" height="120">
+          <defs><linearGradient id="gB2" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#173528"/><stop offset="100%" stop-color="#265842"/>
+          </linearGradient></defs>
+          <rect width="100" height="100" fill="url(#gB2)"/>
+          <text x="50" y="70" text-anchor="middle"
+            font-family="'Playfair Display', Georgia, serif"
+            font-size="76" font-weight="700" font-style="italic"
+            fill="#FAF7F2" opacity="0.97">C</text>
+          <circle cx="71" cy="78" r="3.8" fill="#C07A12"/>
+        </svg>
+      </div>
+    </div>
+    <div class="label"><strong>B — Serif / dark</strong>Playfair italic C, dark green</div>
+  </div>
+
+  <!-- ── C: Serif C, cream bg ───────────────────────── -->
+  <div class="option">
+    <div class="sizes">
+      <div class="icon-wrap" style="width:60px;height:60px">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="60" height="60">
+          <rect width="100" height="100" fill="#FAF7F2"/>
+          <text x="50" y="70" text-anchor="middle"
+            font-family="'Playfair Display', Georgia, serif"
+            font-size="76" font-weight="700" font-style="italic"
+            fill="#173528">C</text>
+          <circle cx="71" cy="78" r="3.8" fill="#C07A12"/>
+        </svg>
+      </div>
+      <div class="icon-wrap" style="width:120px;height:120px">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="120" height="120">
+          <rect width="100" height="100" fill="#FAF7F2"/>
+          <text x="50" y="70" text-anchor="middle"
+            font-family="'Playfair Display', Georgia, serif"
+            font-size="76" font-weight="700" font-style="italic"
+            fill="#173528">C</text>
+          <circle cx="71" cy="78" r="3.8" fill="#C07A12"/>
+        </svg>
+      </div>
+    </div>
+    <div class="label"><strong>C — Serif / cream</strong>Playfair italic C, warm bg</div>
+  </div>
+
+  <!-- ── D: Round-cap arc + heart ──────────────────── -->
+  <div class="option">
+    <div class="sizes">
+      <div class="icon-wrap" style="width:60px;height:60px">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="60" height="60">
+          <defs><linearGradient id="gD" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#173528"/><stop offset="100%" stop-color="#2A8B68"/>
+          </linearGradient></defs>
+          <rect width="100" height="100" fill="url(#gD)"/>
+          <!-- Round-cap C arc -->
+          <circle cx="50" cy="50" r="29" fill="none" stroke="#FAF7F2" stroke-width="14"
+            stroke-linecap="round"
+            stroke-dasharray="108 74"
+            transform="rotate(73 50 50)"/>
+          <!-- Small cream heart centred inside the C -->
+          <path d="M50,62 C50,62 34,52 34,42 C34,35 40,30 46,30 C48.5,30 50,32 50,32 C50,32 51.5,30 54,30 C60,30 66,35 66,42 C66,52 50,62 50,62Z"
+            fill="#FAF7F2" opacity="0.22"/>
+        </svg>
+      </div>
+      <div class="icon-wrap" style="width:120px;height:120px">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="120" height="120">
+          <defs><linearGradient id="gD2" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#173528"/><stop offset="100%" stop-color="#2A8B68"/>
+          </linearGradient></defs>
+          <rect width="100" height="100" fill="url(#gD2)"/>
+          <circle cx="50" cy="50" r="29" fill="none" stroke="#FAF7F2" stroke-width="14"
+            stroke-linecap="round"
+            stroke-dasharray="108 74"
+            transform="rotate(73 50 50)"/>
+          <path d="M50,62 C50,62 34,52 34,42 C34,35 40,30 46,30 C48.5,30 50,32 50,32 C50,32 51.5,30 54,30 C60,30 66,35 66,42 C66,52 50,62 50,62Z"
+            fill="#FAF7F2" opacity="0.22"/>
+        </svg>
+      </div>
+    </div>
+    <div class="label"><strong>D — Rounded + heart</strong>Pill-cap arc, subtle heart inside</div>
+  </div>
+
+</div>
+
+<p class="note">B &amp; C use Playfair Display — the app's heading font — so the C has proper serif terminals and swashes. That's the "warmer" letterform direction. A &amp; D are geometric. Pick a direction and we'll dial it in.</p>
+
+<!-- ── E: Geometric arc + single dot (A font, B dot placement) ── -->
+<div style="display:flex;flex-direction:column;align-items:center;gap:14px;margin-top:8px;">
+  <p style="font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin:0">A ring · B dot</p>
+  <div style="display:flex;gap:16px;align-items:flex-end;">
+    <div class="icon-wrap" style="width:60px;height:60px">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="60" height="60">
+        <defs><linearGradient id="gE" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#173528"/><stop offset="100%" stop-color="#2A8B68"/>
+        </linearGradient></defs>
+        <rect width="100" height="100" fill="url(#gE)"/>
+        <circle cx="50" cy="50" r="29" fill="none" stroke="#FAF7F2" stroke-width="15"
+          stroke-dasharray="123.6 58.6" transform="rotate(58 50 50)"/>
+        <circle cx="74" cy="88" r="4" fill="#C07A12"/>
+      </svg>
+    </div>
+    <div class="icon-wrap" style="width:120px;height:120px">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="120" height="120">
+        <defs><linearGradient id="gE2" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#173528"/><stop offset="100%" stop-color="#2A8B68"/>
+        </linearGradient></defs>
+        <rect width="100" height="100" fill="url(#gE2)"/>
+        <circle cx="50" cy="50" r="29" fill="none" stroke="#FAF7F2" stroke-width="15"
+          stroke-dasharray="123.6 58.6" transform="rotate(58 50 50)"/>
+        <circle cx="74" cy="88" r="4" fill="#C07A12"/>
+      </svg>
+    </div>
+    <div class="icon-wrap" style="width:180px;height:180px">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="180" height="180">
+        <defs><linearGradient id="gE3" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#173528"/><stop offset="100%" stop-color="#2A8B68"/>
+        </linearGradient></defs>
+        <rect width="100" height="100" fill="url(#gE3)"/>
+        <circle cx="50" cy="50" r="29" fill="none" stroke="#FAF7F2" stroke-width="15"
+          stroke-dasharray="123.6 58.6" transform="rotate(58 50 50)"/>
+        <circle cx="74" cy="88" r="4" fill="#C07A12"/>
+      </svg>
+    </div>
+  </div>
+  <div style="font-size:12px;font-weight:600;color:#666;text-align:center;line-height:1.5;">
+    <strong style="display:block;font-size:14px;color:#1C1C1E;font-weight:800;">E — A ring + B dot</strong>
+    Geometric C, single amber period
+  </div>
+</div>
+
+</body>
+</html>
