@@ -8,11 +8,11 @@
 
 ## 🎯 Current State
 
-**App status:** Feature-complete v1. Phase 1 (Supabase migration) complete and live on `main`. Hash routing live — `/#lists` is Joelle's bookmark. April 20 session imported and rolled forward.
+**App status:** Feature-complete v1. Phase 1 (Supabase migration) complete, hardened, and live on `main`. Hash routing live — `/#lists` is Joelle's bookmark. April 20 session imported and rolled forward. 5 Phase 1 data integrity issues fixed and merged.
 
-**Current phase:** Phase 2 planning — real-time subscriptions so Chad and Joelle see each other's changes live without refresh.
+**Current phase:** Phase 2 planning — scope decision is the first task next session.
 
-**Immediate next task:** Red-team Phase 1 (5 known issues below), then decide Phase 2 scope.
+**Immediate next task:** Phase 2 brainstorm — decide real-time scope (todos only vs. all tables), and whether any other features (action items tab, session history stub) belong in Phase 2 before real-time work starts.
 
 ---
 
@@ -39,6 +39,7 @@
 | 2026-04-21 | Supabase anon key committed to source | Anon key is public by design; RLS `family_id = 'stewarts'` protects data. Acceptable for a private family app. |
 | 2026-04-21 | Hash-based routing for direct screen links | `/#lists` (alias for `/#ourlist`) is Joelle's bookmark. Every screen linkable by id. No server config needed — pure client-side. `go()` updates hash; `hashchange` listener keeps back/forward working. |
 | 2026-04-21 | Import flow accepts plain `--- Chad ---` / `[ ]` format | Parser handles both app export format and manual plain-text lists. Confirmed working with April 20 session RTF content. |
+| 2026-04-21 | Phase 1 hardened — 5 data integrity fixes | PrepMode re-fetches todos on mount (no stale Last Session tab). Save button has double-click guard + try/catch. All fire-and-forget db writes log errors via `.then()`. `addTodo`/`addNote` show inline error on failure. `saveUpcomingNote` debounced 400ms. FloatingBubble shows "Syncing…" instead of stale count while re-fetching on open. |
 
 ---
 
@@ -46,9 +47,9 @@
 
 | Question | Context |
 |---|---|
-| PrepMode "Last Session" tab staleness | `INIT.todos` is populated at app load. If todos were added mid-session before opening Prep Mode, the Last Session tab shows the load-time snapshot, not current state. Does this need a re-fetch on PrepMode open? |
-| UpcomingChanges debounce | `saveUpcomingNote` fires on every keystroke. Fine for now (5 fields, low traffic), but worth deciding if we ever see flicker or race conditions. |
-| Phase 2 scope | Real-time on todos only? Or todos + priorities + notes + upcoming_notes? Starting narrow is safer. |
+| Phase 2 real-time scope | Todos only first (lowest risk, highest value)? Or add priorities + notes to the same subscription? Narrow scope is safer — can expand if stable. |
+| Action items tab | Chad's April 20 idea: a dedicated place for "upcoming budget considerations" (holidays, debt payoffs, seasonal spending). Is this Phase 2? A new screen? An enhancement to Upcoming Changes? |
+| Any features before real-time? | Session history stub, Edit Mode, or action items tab — should any of these come before real-time subscriptions or run in parallel? |
 
 ---
 
@@ -56,7 +57,8 @@
 
 | Idea | Notes |
 |---|---|
-| **Real-time sync (Phase 2)** | **Active next phase.** Supabase `postgres_changes` channel subscriptions on todos, priorities, notes. Start with todos only; expand if stable. Do after Phase 1 is confirmed working in production. |
+| **Real-time sync (Phase 2)** | **Active — scope decision is next session's first task.** Supabase `postgres_changes` channel on todos table; expand to priorities + notes if stable. Scope question is open (see above). |
+| Action items / upcoming budget tab | Chad's April 20 idea. A place for forward-looking budget considerations — holidays, debt payoffs, big upcoming expenses. Could be a new screen, an enhancement to Upcoming Changes, or a new tab in Our Lists. Worth scoping in Phase 2 brainstorm. |
 | Edit Mode (in-session data editing) | Let Chad update a balance mid-session without going to Prep Mode. Needs a lightweight UI — not a full Prep Mode clone. |
 | Session history | Store each completed session. View past sessions. Foundation for trend tracking. |
 | Bank CSV import | Drag-and-drop CSV, auto-categorize, update spending averages. Needs session history first. |
@@ -89,6 +91,8 @@
 ---
 
 ## 📝 Change Log
+
+**[2026-04-21]** — Phase 1 hardened. 5 red-team fixes shipped and merged to main: PrepMode Last Session tab now re-fetches todos on mount; Save button has double-click guard (saving state + try/catch); all fire-and-forget db writes log errors; `addTodo`/`addNote` show inline "Failed to save" on failure; `saveUpcomingNote` debounced 400ms; FloatingBubble shows "Syncing…" instead of stale count while loading on open.
 
 **[2026-04-21]** — Hash routing added. Every screen directly linkable via `/#screen-id`. `/#lists` is Joelle's bookmark for Our Lists. Import flow confirmed accepting plain `--- Chad ---` / `[ ]` text format — April 20 session successfully rolled forward.
 
