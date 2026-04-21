@@ -1,0 +1,1894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cadence — Stewart Family</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { height: 100%; font-family: 'Outfit', sans-serif; background: #FAF7F2; color: #1C1C1E; }
+    input[type=range] { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px; background: #E8E3DB; outline: none; }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: currentColor; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-thumb { background: #D4CFC8; border-radius: 3px; }
+    .hover-lift { transition: box-shadow 0.15s, transform 0.15s; }
+    .hover-lift:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); transform: translateY(-1px); }
+    .check-btn:hover { opacity: 0.85; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+</body>
+</html>
+</script>
+<script>
+window.generateListHTML = function(items) {
+  var dateStr = new Date().toLocaleDateString('en-US', {month:'long',day:'numeric',year:'numeric'});
+  var dataJson = JSON.stringify(items);
+  var css = [
+    '*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}',
+    'body{font-family:Outfit,sans-serif;background:#FAF7F2;color:#1C1C1E;min-height:100vh;padding-bottom:100px}',
+    '.header{background:#fff;border-bottom:1px solid #E8E3DB;padding:20px 20px 0;position:sticky;top:0;z-index:10}',
+    '.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}',
+    'h1{font-size:22px;font-weight:800}',
+    '.dt{font-size:12px;color:#6B6B70}',
+    '.pl{font-size:13px;font-weight:700;color:#2A8B68}',
+    '.pw{background:#E8E3DB;border-radius:4px;height:4px;width:80px;margin-top:4px;margin-left:auto;overflow:hidden}',
+    '.pf{height:100%;background:#2A8B68;border-radius:4px}',
+    '.tabs{display:flex}',
+    '.tab{flex:1;padding:12px 0;text-align:center;font-size:14px;font-weight:700;border:none;background:none;cursor:pointer;color:#6B6B70;border-bottom:3px solid transparent}',
+    '.tab.active{color:#1C1C1E;border-bottom-color:#1C1C1E}',
+    '.sec{padding:20px 20px 0}',
+    '.slbl{font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:#6B6B70;margin-bottom:12px;margin-top:8px}',
+    '.item{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;background:#fff;border-radius:14px;border:1px solid #E8E3DB;margin-bottom:8px}',
+    '.item.done{background:#EDF7F2;border-color:#A8D5C2}',
+    '.ck{width:24px;height:24px;border-radius:8px;border:2px solid #E8E3DB;background:transparent;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center}',
+    '.ck.on{background:#2A8B68;border-color:#2A8B68;color:#fff;font-weight:900;font-size:13px}',
+    '.it{font-size:15px;line-height:1.4;flex:1;padding-top:2px}',
+    '.it.done{color:#6B6B70;text-decoration:line-through}',
+    '.dl{background:none;border:none;color:#D4CFC8;font-size:20px;cursor:pointer;padding:0 2px}',
+    '.add{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #E8E3DB;padding:12px 20px;padding-bottom:max(12px,env(safe-area-inset-bottom));display:flex;gap:10px}',
+    '.inp{flex:1;border:1px solid #E8E3DB;border-radius:12px;padding:12px 14px;font-size:15px;font-family:Outfit,sans-serif;outline:none;background:#FAF7F2}',
+    '.addbtn{background:#2A8B68;color:#fff;border:none;border-radius:12px;padding:12px 18px;font-size:18px;font-weight:700;cursor:pointer}',
+    '.empty{text-align:center;padding:40px 20px;color:#6B6B70;font-size:15px}',
+    '.hint{margin:16px 20px 0;background:#EDF7F2;border:1px solid #A8D5C2;border-radius:14px;padding:14px 16px;display:none}',
+    '.hp{font-size:13px;color:#2A8B68;font-weight:600;margin-bottom:4px}',
+    '.hs{font-size:12px;color:#6B6B70;line-height:1.5;display:block}'
+  ].join('');
+
+  var js = '(function(){'
+    + 'var BAKED=' + dataJson + ';'
+    + 'var LSKEY="ourlist_" + BAKED.chad.length + "_" + BAKED.joelle.length;'
+    + 'var data=JSON.parse(JSON.stringify(BAKED));'
+    + 'try{var s=localStorage.getItem(LSKEY);if(s){var d=JSON.parse(s);if(d&&d.chad&&d.joelle)data=d;}}catch(e){}'
+    + 'var cur="chad";'
+    + 'function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}'
+    + 'function save(){try{localStorage.setItem(LSKEY,JSON.stringify(data));}catch(e){}}'
+    + 'function render(){'
+    +   'var all=data.chad.concat(data.joelle);'
+    +   'var done=all.filter(function(i){return i.done;}).length;'
+    +   'var prog=document.getElementById("prog");if(prog)prog.textContent=done+"/"+all.length+" done";'
+    +   'var pf=document.getElementById("pf");if(pf)pf.style.width=all.length?((done/all.length)*100)+"%":"0%";'
+    +   'var c=document.getElementById("list");c.innerHTML="";'
+    +   'var people=cur==="all"?["chad","joelle"]:[cur];'
+    +   'var names={chad:"\u{1F466} Chad",joelle:"\u{1F469} Joelle"};'
+    +   'people.forEach(function(p){'
+    +     'if(cur==="all"){var lbl=document.createElement("div");lbl.className="slbl";lbl.textContent=names[p];c.appendChild(lbl);}'
+    +     'if(!data[p].length){if(cur!=="all"){var e=document.createElement("div");e.className="empty";e.textContent="No items yet — add one below!";c.appendChild(e);}return;}'
+    +     'data[p].forEach(function(item){'
+    +       'var d=document.createElement("div");d.className="item"+(item.done?" done":"");'
+    +       'var ckDiv=document.createElement("div");ckDiv.className="ck"+(item.done?" on":"");'
+    +       'if(item.done){ckDiv.textContent="\u2713";}'
+    +       'ckDiv.setAttribute("onclick","tog(\""+p+"\","+item.id+")");'
+    +       'var txt=document.createElement("span");txt.className="it"+(item.done?" done":"");txt.textContent=item.text;'
+    +       'var del=document.createElement("button");del.className="dl";del.textContent="\u00d7";'
+    +       'del.setAttribute("onclick","del2(\""+p+"\","+item.id+")");'
+    +       'd.appendChild(ckDiv);d.appendChild(txt);d.appendChild(del);c.appendChild(d);'
+    +     '});'
+    +   '});'
+    + '}'
+    + 'window.sw=function(t){'
+    +   'cur=t;'
+    +   '["chad","joelle","all"].forEach(function(x){var el=document.getElementById("t"+x.charAt(0).toUpperCase()+x.slice(1));if(el)el.classList.toggle("active",x===t);});'
+    +   'var inp=document.getElementById("inp");'
+    +   'if(t==="all"){inp.disabled=true;inp.style.opacity="0.5";inp.placeholder="Switch to a person tab to add";}' 
+    +   'else{inp.disabled=false;inp.style.opacity="1";inp.placeholder="Add an item for "+(t==="chad"?"Chad":"Joelle")+"...";}'
+    +   'render();'
+    + '};'
+    + 'window.addItem=function(){'
+    +   'if(cur==="all")return;'
+    +   'var v=document.getElementById("inp").value.trim();if(!v)return;'
+    +   'data[cur].push({text:v,done:false,id:Date.now()});'
+    +   'save();document.getElementById("inp").value="";render();'
+    + '};'
+    + 'window.tog=function(p,id){'
+    +   'var item=data[p].find(function(x){return x.id===id;});'
+    +   'if(item){item.done=!item.done;save();render();}'
+    + '};'
+    + 'window.del2=function(p,id){'
+    +   'data[p]=data[p].filter(function(x){return x.id!==id;});'
+    +   'save();render();'
+    + '};'
+    + 'document.getElementById("inp").addEventListener("keydown",function(e){if(e.key==="Enter")addItem();});'
+    + 'if(/^((?!chrome|android).)*safari/i.test(navigator.userAgent)&&!navigator.standalone){document.getElementById("hint").style.display="block";}'
+    + 'render();'
+    + '})();';
+
+  return '<!DOCTYPE html>'
+    + '<html lang="en"><head>'
+    + '<meta charset="UTF-8">'
+    + '<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">'
+    + '<meta name="apple-mobile-web-app-capable" content="yes">'
+    + '<meta name="apple-mobile-web-app-title" content="Our List">'
+    + '<title>Our List - Stewart Family</title>'
+    + '<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;800&display=swap" rel="stylesheet">'
+    + '<style>' + css + '</style>'
+    + '</head><body>'
+    + '<div class="header">'
+    +   '<div class="top"><div><h1>&#x1F49A; Our List</h1><p class="dt">' + dateStr + '</p></div>'
+    +   '<div style="text-align:right"><p class="pl" id="prog"></p><div class="pw"><div class="pf" id="pf" style="width:0%"></div></div></div></div>'
+    +   '<div class="tabs">'
+    +   '<button class="tab active" id="tChad" onclick="sw(&apos;chad&apos;)">&#x1F466; Chad</button>'
+    +   '<button class="tab" id="tJoelle" onclick="sw(&apos;joelle&apos;)">&#x1F469; Joelle</button>'
+    +   '<button class="tab" id="tAll" onclick="sw(&apos;all&apos;)">&#x1F4CB; All</button>'
+    +   '</div>'
+    + '</div>'
+    + '<div class="hint"><p class="hp">&#x1F4F1; Add to home screen</p><span class="hs">Tap Share in Safari → "Add to Home Screen"</span></div>'
+    + '<div class="sec" id="list" style="margin-bottom:90px"></div>'
+    + '<div class="add"><input class="inp" id="inp" placeholder="Add an item for Chad..."><button class="addbtn" onclick="addItem()">+</button></div>'
+    + '<script>' + js + '<' + '/script>'
+    + '</body></html>';
+};
+</script>
+
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+// ─── DATA ─────────────────────────────────────────────────────────────────────
+const DEFAULT_D = {
+  date: "April 20, 2026",
+  accounts: {
+    billing: 2934.81, groceries: 19.20, propertyTax: 2400.67,
+    emergency: 6057.23, ordoWATB: 3327.47, baselane: 2005.45,
+    totalLiquid: 16744.83, sapphire: 5886.66, ink: 2105.87,
+    totalDebt: 7992.53, netCash: 8752.30,
+  },
+  income: { total: 8530, sources: [
+    { label: "Chad — Barrett & Co. payroll", amt: 4630.85, acct: "Billing", when: "End of month" },
+    { label: "Chad — Barrett ACH mid-month", amt: 1200.00, acct: "Billing", when: "~13th–16th" },
+    { label: "Chad — payroll split", amt: 650.00, acct: "Groceries", when: "End of month" },
+    { label: "ORDO business income", amt: 1000, acct: "ORDO WATB", when: "By ~5th of month", note: "Transfer to Billing as needed" },
+    { label: "Rental income", amt: 1000, acct: "Baselane", when: "By ~5th of month", note: "Transfer to Billing as needed" },
+  ]},
+  fixedBills: 4628,
+  variableSpend: 2971,
+  deficit: 1231,
+  spending: [
+    { cat: "Amazon (Ink card)", mo: 1483, note: "192 transactions YTD — ~2 orders/day", color: "#D4544A", lever: true },
+    { cat: "DoorDash + Instacart", mo: 724, note: "~10 DoorDash + 1 large Instacart/mo", color: "#E09640", lever: true },
+    { cat: "Groceries (in-store)", mo: 300, note: "WinCo, Safeway, Target", color: "#5A7FA8", lever: false },
+    { cat: "Vaping", mo: 182, note: "4 shops across 3 accounts", color: "#8A6FA8", lever: true },
+    { cat: "Thistle meal delivery", mo: 86, note: "Subscription on Groceries acct", color: "#6FA894", lever: true },
+    { cat: "Dutch Bros", mo: 62, note: "27 visits YTD across 3 accounts", color: "#A87D5A", lever: false },
+    { cat: "Other subscriptions", mo: 134, note: "IXL, Scribd, VTHELEAPLY, Visible, etc.", color: "#7D8A6F", lever: true },
+  ],
+  goals: [
+    { name: "Emergency Fund", saved: 4000, target: 10000, icon: "🛡️", note: "$6,057 in account · $4k allocated to goal" },
+    { name: "New Baby", saved: 2000, target: 8000, icon: "👶", note: "Medical + leave buffer" },
+    { name: "New Roof", saved: 2000, target: 5000, icon: "🏠", note: "Rental property" },
+    { name: "Passport Trip", saved: 0, target: 2000, icon: "✈️", note: "First international trip as a family" },
+  ],
+  _actions: [
+    { when: "This week", text: "Check Chase app — confirm exact spend toward $8k Sapphire bonus threshold", impact: "+$1,000 incoming" },
+    { when: "This week", text: "Pay $300 ORDO website renewal — annual expense, due this week", impact: "Business essential" },
+    { when: "This week", text: "Pay $400 Tesla tabs & licensing renewal — annual expense, due this week", impact: "Annual, not recurring" },
+    { when: "This week", text: "Transfer $300 to Groceries account today to create a buffer and stop overdrafts", impact: "Ends $195/yr in fees" },
+    { when: "This week", text: "Identify VTHELEAPLY — the mysterious $19.99/mo Las Vegas subscription", impact: "$240/yr if it's nothing" },
+    { when: "This month", text: "Set a $800/mo Amazon budget cap — check in together weekly", impact: "~$680/mo freed up" },
+    { when: "This month", text: "Cap DoorDash at 5 orders this month (currently averaging 10+)", impact: "~$250/mo saved" },
+    { when: "This month", text: "On the 1st: proactively transfer $1,200 to Groceries — fund the month upfront", impact: "No more scrambling" },
+    { when: "When bonus hits", text: "Apply the full $1,000 Sapphire cash back directly to the Sapphire balance", impact: "Balance → ~$4,887" },
+    { when: "When bonus hits", text: "Stop putting daily spending on Sapphire — back to debit to stop interest accrual", impact: "Accelerates payoff" },
+  ],
+};
+
+// Live data — merges DEFAULT_D with any edits saved during Prep Mode
+const D = (() => {
+  try {
+    const saved = JSON.parse(localStorage.getItem('moneydate_data') || 'null');
+    if (!saved) return DEFAULT_D;
+    return {
+      ...DEFAULT_D,
+      ...saved,
+      date: DEFAULT_D.date,
+      accounts: { ...DEFAULT_D.accounts, ...(saved.accounts || {}) },
+      income: {
+        total: saved.income?.total ?? DEFAULT_D.income.total,
+        sources: saved.income?.sources ?? DEFAULT_D.income.sources,
+      },
+      spending: saved.spending ?? DEFAULT_D.spending,
+      fixedBills: saved.fixedBills ?? DEFAULT_D.fixedBills,
+      variableSpend: saved.variableSpend ?? DEFAULT_D.variableSpend,
+      deficit: saved.deficit ?? DEFAULT_D.deficit,
+    };
+  } catch { return DEFAULT_D; }
+})();
+
+// ─── TOKENS ───────────────────────────────────────────────────────────────────
+const T = {
+  cream: '#FAF7F2', ink: '#1C1C1E', dim: '#6B6B70',
+  border: '#E8E3DB', card: '#FFFFFF',
+  green: '#2A8B68', coral: '#D4544A', amber: '#C07A12', purple: '#6B5EA8',
+  greenBg: '#EDF7F2', coralBg: '#FEF0EE', amberBg: '#FEF6E7',
+  greenMid: '#A8D5C2', coralMid: '#F5C6C2', amberMid: '#F0D9A0',
+};
+
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+const $  = (n) => new Intl.NumberFormat('en-US', { style:'currency', currency:'USD', minimumFractionDigits:0, maximumFractionDigits:0 }).format(n);
+const $$ = (n) => new Intl.NumberFormat('en-US', { style:'currency', currency:'USD', minimumFractionDigits:2, maximumFractionDigits:2 }).format(n);
+const monthsAhead = (n) => {
+  const d = new Date(2026, 3, 1); d.setMonth(d.getMonth() + n);
+  return d.toLocaleDateString('en-US', { month:'long', year:'numeric' });
+};
+
+// ─── SHARED UI ────────────────────────────────────────────────────────────────
+const Card = ({ children, style }) => (
+  <div style={{ background: T.card, borderRadius: 16, border: `1px solid ${T.border}`, padding: 24, ...style }}>{children}</div>
+);
+
+const Tag = ({ children, color = 'green' }) => {
+  const map = { green: [T.greenBg, T.green], amber: [T.amberBg, T.amber], red: [T.coralBg, T.coral] };
+  return <span style={{ background: map[color][0], color: map[color][1], borderRadius: 100, padding: '4px 14px', fontSize: 12, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase' }}>{children}</span>;
+};
+
+const Bar = ({ val, max, color = T.green, h = 8 }) => (
+  <div style={{ background: T.border, borderRadius: h, height: h, overflow:'hidden' }}>
+    <div style={{ width: `${Math.min(100, (val/max)*100)}%`, height:'100%', background: color, borderRadius: h, transition: 'width 0.5s ease' }} />
+  </div>
+);
+
+const RangeSlider = ({ label, min, max, step, value, onChange, fmt: fmtFn = $, color = T.green }) => (
+  <div>
+    <div style={{ display:'flex', justifyContent:'space-between', marginBottom: 8 }}>
+      <span style={{ fontSize: 13, color: T.dim }}>{label}</span>
+      <span style={{ fontSize: 15, fontWeight: 700, color }}>{fmtFn(value)}</span>
+    </div>
+    <input type="range" min={min} max={max} step={step} value={value}
+      onChange={e => onChange(Number(e.target.value))}
+      style={{ color, cursor:'pointer' }} />
+    <div style={{ display:'flex', justifyContent:'space-between', marginTop:3 }}>
+      <span style={{ fontSize: 11, color: T.border }}>{fmtFn(min)}</span>
+      <span style={{ fontSize: 11, color: T.border }}>{fmtFn(max)}</span>
+    </div>
+  </div>
+);
+
+const SectionHeader = ({ tag, tagColor, title, sub }) => (
+  <div style={{ marginBottom: 28 }}>
+    <Tag color={tagColor}>{tag}</Tag>
+    <h2 style={{ fontFamily:"'Playfair Display', serif", fontSize: 36, fontWeight: 700, marginTop: 10, marginBottom: 6, lineHeight: 1.1 }}>{title}</h2>
+    {sub && <p style={{ color: T.dim, fontSize: 15 }}>{sub}</p>}
+  </div>
+);
+
+// ─── SESSION IMPORT PARSER ────────────────────────────────────────────────────
+const parseExport = (text) => {
+  const result = { chad: [], joelle: [], priorities: ['','',''], notes: [] };
+  let section = null;
+  const lines = text.split('\n');
+  lines.forEach(raw => {
+    const line = raw.trim();
+    if (line.includes("CHAD'S TO-DOS") || line === '--- Chad ---') { section = 'chad'; return; }
+    if (line.includes("JOELLE'S TO-DOS") || line === '--- Joelle ---') { section = 'joelle'; return; }
+    if (line.includes('PRIORITIES')) { section = 'priorities'; return; }
+    if (line.includes('NOTES')) { section = 'notesSection'; return; }
+    if (line.startsWith('---') || line.startsWith('===') || !line) return;
+
+    if (section === 'chad' || section === 'joelle') {
+      const done = line.startsWith('[x]');
+      const notDone = line.startsWith('[ ]');
+      if (done || notDone) {
+        result[section].push({ text: line.slice(4).trim(), done, id: Date.now() + Math.random() });
+      }
+    }
+    if (section === 'priorities') {
+      const m = line.match(/^Goal #(\d):\s*(.+)/);
+      if (m) result.priorities[parseInt(m[1])-1] = m[2];
+    }
+    if (section === 'notesSection') {
+      const m = line.match(/^\d+\.\s*(.+)/);
+      if (m) result.notes.push({ text: m[1], id: Date.now() + Math.random() });
+    }
+  });
+  return result;
+};
+
+// ─── SCREEN 0: WELCOME ────────────────────────────────────────────────────────
+const Welcome = ({ onStart, onPrep }) => {
+  const [mode, setMode] = useState('home'); // 'home' | 'import' | 'recap'
+  const [pasteText, setPasteText] = useState('');
+  const [parsed, setParsed] = useState(null);
+  const [rollForward, setRollForward] = useState(true);
+
+  const handleParse = () => {
+    const p = parseExport(pasteText);
+    const hasContent = p.chad.length > 0 || p.joelle.length > 0;
+    if (!hasContent) { alert("Couldn't find any to-do items in that text. Make sure you pasted the full exported session."); return; }
+    setParsed(p);
+    setMode('recap');
+  };
+
+  const handleStartWithImport = () => {
+    if (rollForward && parsed) {
+      const rollChad = parsed.chad.filter(i => !i.done).map(i => ({ ...i, id: Date.now() + Math.random() }));
+      const rollJoelle = parsed.joelle.filter(i => !i.done).map(i => ({ ...i, id: Date.now() + Math.random() }));
+      const existing = (() => { try { return JSON.parse(localStorage.getItem('moneydate_list') || '{"chad":[],"joelle":[]}'); } catch { return { chad:[], joelle:[] }; }})();
+      localStorage.setItem('moneydate_list', JSON.stringify({
+        chad: [...rollChad, ...existing.chad],
+        joelle: [...rollJoelle, ...existing.joelle],
+      }));
+    }
+    onStart();
+  };
+
+  const chadDone = parsed ? parsed.chad.filter(i=>i.done).length : 0;
+  const joelleDone = parsed ? parsed.joelle.filter(i=>i.done).length : 0;
+  const chadRoll = parsed ? parsed.chad.filter(i=>!i.done).length : 0;
+  const joelleRoll = parsed ? parsed.joelle.filter(i=>!i.done).length : 0;
+
+  if (mode === 'import') return (
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', padding:'40px 60px', gap:20, maxWidth:680, margin:'0 auto' }}>
+      <button onClick={()=>setMode('home')} style={{ alignSelf:'flex-start', background:'none', border:'none', cursor:'pointer', color:T.dim, fontSize:14 }}>← Back</button>
+      <div style={{ fontSize:48 }}>📋</div>
+      <h2 style={{ fontFamily:"'Playfair Display', serif", fontSize:34, fontWeight:700, textAlign:'center', lineHeight:1.1 }}>Import Previous Session</h2>
+      <p style={{ color:T.dim, fontSize:14, textAlign:'center', lineHeight:1.7 }}>Paste the exported text from your last session. We'll show you a recap and let you roll any unfinished items forward into this session.</p>
+      <textarea
+        value={pasteText}
+        onChange={e=>setPasteText(e.target.value)}
+        placeholder="Paste exported session text here..."
+        rows={10}
+        style={{ width:'100%', border:`1px solid ${T.border}`, borderRadius:14, padding:'16px', fontSize:13, fontFamily:'monospace', outline:'none', resize:'vertical', background:T.card, color:T.ink, lineHeight:1.6 }}
+      />
+      <button onClick={handleParse} disabled={!pasteText.trim()} style={{
+        background: pasteText.trim() ? T.ink : T.border, color:'#fff', border:'none', borderRadius:100,
+        padding:'13px 40px', fontSize:15, fontWeight:700, cursor: pasteText.trim() ? 'pointer' : 'default'
+      }}>Parse & Show Recap →</button>
+    </div>
+  );
+
+  if (mode === 'recap' && parsed) return (
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', padding:'40px 60px', gap:20, maxWidth:700, margin:'0 auto' }}>
+      <div style={{ fontSize:48 }}>🏆</div>
+      <h2 style={{ fontFamily:"'Playfair Display', serif", fontSize:34, fontWeight:700, textAlign:'center', lineHeight:1.1 }}>Session Recap</h2>
+      <p style={{ color:T.dim, fontSize:14, textAlign:'center' }}>Here's how the last session wrapped up.</p>
+
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, width:'100%' }}>
+        {[
+          { name:'Chad', done: chadDone, total: parsed.chad.length, roll: chadRoll, color: T.green },
+          { name:'Joelle', done: joelleDone, total: parsed.joelle.length, roll: joelleRoll, color: T.purple },
+        ].map(p => (
+          <div key={p.name} style={{ background:T.card, border:`1px solid ${T.border}`, borderRadius:16, padding:'20px 22px' }}>
+            <p style={{ fontSize:16, fontWeight:800, marginBottom:12 }}>{p.name}</p>
+            <p style={{ fontSize:36, fontWeight:800, color: p.done === p.total && p.total > 0 ? T.green : T.ink, lineHeight:1 }}>{p.done}/{p.total}</p>
+            <p style={{ fontSize:13, color:T.dim, marginTop:4, marginBottom:14 }}>items completed</p>
+            {p.total > 0 && <Bar val={p.done} max={p.total} color={p.color} h={8} />}
+            {p.roll > 0 && <p style={{ fontSize:12, color:T.amber, marginTop:10, fontWeight:600 }}>↩ {p.roll} unfinished item{p.roll>1?'s':''}</p>}
+          </div>
+        ))}
+      </div>
+
+      {(chadRoll > 0 || joelleRoll > 0) && (
+        <div onClick={()=>setRollForward(r=>!r)} style={{
+          display:'flex', alignItems:'center', gap:14, background: rollForward ? T.greenBg : T.card,
+          border:`1px solid ${rollForward ? T.greenMid : T.border}`, borderRadius:14, padding:'16px 20px', cursor:'pointer', width:'100%'
+        }}>
+          <div style={{ width:22, height:22, borderRadius:7, border:`2px solid ${rollForward ? T.green : T.border}`, background: rollForward ? T.green : 'transparent', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+            {rollForward && <span style={{ color:'#fff', fontSize:12, fontWeight:800 }}>✓</span>}
+          </div>
+          <div>
+            <p style={{ fontSize:14, fontWeight:700 }}>Roll {chadRoll + joelleRoll} unfinished item{(chadRoll+joelleRoll)>1?'s':''} into this session</p>
+            <p style={{ fontSize:12, color:T.dim, marginTop:2 }}>They'll appear at the top of Chad's and Joelle's to-do lists</p>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display:'flex', gap:12, width:'100%' }}>
+        <button onClick={()=>setMode('import')} style={{ flex:1, background:'none', border:`1px solid ${T.border}`, borderRadius:100, padding:'12px', fontSize:14, cursor:'pointer', color:T.dim }}>← Re-paste</button>
+        <button onClick={handleStartWithImport} style={{ flex:2, background:T.ink, color:'#fff', border:'none', borderRadius:100, padding:'12px', fontSize:15, fontWeight:700, cursor:'pointer' }}>Start this session →</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', textAlign:'center', padding: '40px 60px', gap: 24 }}>
+      <div style={{ fontSize: 56 }}>💚</div>
+      <div>
+        <h1 style={{ fontFamily:"'Playfair Display', serif", fontSize: 54, fontWeight: 700, lineHeight: 1.08, marginBottom: 12 }}>
+          <em>Cadence</em>
+        </h1>
+        <p style={{ color: T.dim, fontSize: 13, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.dim, marginBottom: 4 }}>A Family Budget App</p>
+        <p style={{ color: T.dim, fontSize: 15, marginBottom: 6 }}>{D.date}</p>
+        <p style={{ color: T.dim, fontSize: 15, maxWidth: 520, lineHeight: 1.7 }}>
+          Your family's financial rhythm — the numbers that matter, a clear plan, and a stronger connection every session.
+        </p>
+      </div>
+      <div style={{ display:'flex', flexDirection:'column', gap: 10, width:'100%', maxWidth: 580 }}>
+        <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.2, textTransform:'uppercase', color: T.dim, marginBottom: 2 }}>How this works</p>
+        {[
+          { n:1, text:'Hit the button below together — you\'re already doing it right.' },
+          { n:2, text:'Move through each screen using Next → at the bottom. Read it together out loud.' },
+          { n:3, text:'Use the sliders on Spending, Debt, and Goals screens to explore what-ifs in real time.' },
+          { n:4, text:'On Big Decisions, pick a topic and talk through the question at the bottom.' },
+          { n:5, text:'Add to-dos & notes in the ✅ bubble — export at the end to carry them forward.' },
+        ].map(({ n, text }) => (
+          <div key={n} style={{ display:'flex', alignItems:'flex-start', gap: 14, background: T.card, border:`1px solid ${T.border}`, borderRadius: 12, padding:'12px 16px', textAlign:'left' }}>
+            <div style={{ width: 26, height: 26, borderRadius: '50%', background: T.ink, color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize: 12, fontWeight: 800, flexShrink: 0 }}>{n}</div>
+            <p style={{ fontSize: 13, color: T.ink, lineHeight: 1.5, marginTop: 2 }}>{text}</p>
+          </div>
+        ))}
+      </div>
+      <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:10 }}>
+        <button onClick={onStart} style={{
+          background: T.ink, color:'#fff', border:'none', borderRadius: 100, padding:'15px 48px',
+          fontSize: 17, fontWeight: 700, cursor:'pointer', letterSpacing: 0.3
+        }}>Let's do this →</button>
+        <div style={{ display:'flex', gap:10 }}>
+          <button onClick={()=>setMode('import')} style={{
+            background:'none', border:`1px solid ${T.border}`, borderRadius:100, padding:'10px 20px',
+            fontSize:13, cursor:'pointer', color:T.dim, fontWeight:600
+          }}>📋 Import last session</button>
+          <button onClick={onPrep} style={{
+            background:'none', border:`1px solid ${T.border}`, borderRadius:100, padding:'10px 20px',
+            fontSize:13, cursor:'pointer', color:T.dim, fontWeight:600
+          }}>🔧 Prep next session</button>
+        </div>
+        <p style={{ color: T.dim, fontSize: 12 }}>8 topics · ~35–45 min together</p>
+      </div>
+    </div>
+  );
+};
+
+// ─── SCREEN 1: BIG PICTURE ────────────────────────────────────────────────────
+const BigPicture = () => {
+  const a = D.accounts;
+  return (
+    <div style={{ padding:'32px 48px', maxWidth: 920, margin:'0 auto' }}>
+      <SectionHeader tag="Where We Stand" tagColor="green" title="The Big Picture" sub="Every account, every balance, one honest number." />
+
+      <Card style={{ background:'linear-gradient(135deg, #173528 0%, #265842 100%)', border:'none', color:'#fff', textAlign:'center', padding:'36px', marginBottom: 16 }}>
+        <p style={{ fontSize: 12, letterSpacing: 1.5, opacity: 0.6, marginBottom: 6, textTransform:'uppercase' }}>Our True Net Cash Position</p>
+        <p style={{ fontSize: 68, fontWeight: 800, letterSpacing: -2, lineHeight: 1 }}>{$(a.netCash)}</p>
+        <p style={{ opacity: 0.55, fontSize: 13, marginTop: 8 }}>Total liquid assets minus all credit card debt</p>
+      </Card>
+
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap: 16, marginBottom: 16 }}>
+        <Card style={{ borderTop: `3px solid ${T.green}` }}>
+          <p style={{ fontSize: 11, color: T.dim, letterSpacing:.5, textTransform:'uppercase', marginBottom: 6 }}>Liquid Assets</p>
+          <p style={{ fontSize: 34, fontWeight: 800, color: T.green, marginBottom: 14 }}>{$(a.totalLiquid)}</p>
+          {[
+            ['Billing (main)', a.billing, a.billing < 200],
+            ['Groceries', a.groceries, true],
+            ['Property Tax Savings', a.propertyTax, false],
+            ['Emergency Fund', a.emergency, false],
+            ['ORDO WATB', a.ordoWATB, false],
+            ['Baselane', a.baselane, false],
+          ].map(([lbl, val, warn]) => (
+            <div key={lbl} style={{ display:'flex', justifyContent:'space-between', fontSize: 13, padding:'5px 0', borderBottom:`1px solid ${T.border}` }}>
+              <span style={{ color: T.dim }}>{lbl}</span>
+              <span style={{ fontWeight: 700, color: warn ? T.coral : T.ink }}>{$$(val)}</span>
+            </div>
+          ))}
+        </Card>
+
+        <Card style={{ borderTop: `3px solid ${T.coral}` }}>
+          <p style={{ fontSize: 11, color: T.dim, letterSpacing:.5, textTransform:'uppercase', marginBottom: 6 }}>Credit Card Debt</p>
+          <p style={{ fontSize: 34, fontWeight: 800, color: T.coral, marginBottom: 14 }}>−{$(a.totalDebt)}</p>
+          {[
+            { name: 'Chase Sapphire (2575)', bal: a.sapphire, limit: 10000 },
+            { name: 'Chase Ink (0388)', bal: a.ink, limit: 5000 },
+          ].map(c => (
+            <div key={c.name} style={{ marginBottom: 16 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize: 13, marginBottom: 5 }}>
+                <span style={{ color: T.dim }}>{c.name}</span>
+                <span style={{ fontWeight: 700 }}>{$$(c.bal)}</span>
+              </div>
+              <Bar val={c.bal} max={c.limit} color={T.coral} />
+              <p style={{ fontSize: 11, color: T.dim, marginTop: 3 }}>{Math.round((c.bal/c.limit)*100)}% of {$(c.limit)} limit used</p>
+            </div>
+          ))}
+          <div style={{ background: T.amberBg, borderRadius: 10, padding:'12px 14px', marginTop: 8 }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: T.amber }}>⚡ Sapphire bonus almost there</p>
+            <p style={{ fontSize: 12, color: T.dim, marginTop: 3 }}>~{$(D.accounts.sapphire - 5792)} more in spend triggers $1,000 cash back. Decision to make: apply to balance, or redeem for travel?</p>
+          </div>
+        </Card>
+      </div>
+
+      <Card style={{ background: T.greenBg, border:`1px solid ${T.greenMid}` }}>
+        <p style={{ fontSize: 13, fontWeight: 700, color: T.green, marginBottom: 5 }}>💡 The honest headline</p>
+        <p style={{ fontSize: 14, lineHeight: 1.7 }}>
+          We have <strong>{$(a.netCash)}</strong> in real net worth — a solid foundation most families don't have. The debt is real but completely payable. The Groceries account balance (<strong>{$$(a.groceries)}</strong>) is the only thing that needs attention today.
+        </p>
+      </Card>
+    </div>
+  );
+};
+
+// ─── SCREEN 2: CASH FLOW ─────────────────────────────────────────────────────
+const CashFlow = () => {
+  const { total, sources } = D.income;
+  const remaining = total - D.fixedBills;
+  return (
+    <div style={{ padding:'32px 48px', maxWidth: 920, margin:'0 auto' }}>
+      <SectionHeader tag="Monthly Money" tagColor="amber" title="Where the Money Goes" sub="Our income, our obligations, and the gap in between." />
+
+      <div style={{ display:'grid', gridTemplateColumns:'1fr auto 1fr auto 1fr', alignItems:'center', gap: 10, marginBottom: 20 }}>
+        {[
+          { label:'Take-Home Income', amt: total, note:'~$8,680/mo across all sources', color: T.green },
+          null,
+          { label:'Fixed Bills', amt: D.fixedBills, note:'22 recurring obligations', color: T.amber },
+          null,
+          { label:'Variable Spending', amt: D.variableSpend, note:'YTD monthly average', color: T.coral },
+        ].map((item, i) => item === null
+          ? <div key={i} style={{ textAlign:'center', fontSize: 22, color: T.border }}>→</div>
+          : (
+            <Card key={i} style={{ textAlign:'center', borderTop:`3px solid ${item.color}`, padding:'20px 16px' }}>
+              <p style={{ fontSize: 11, color: T.dim, textTransform:'uppercase', letterSpacing:.5, marginBottom: 4 }}>{item.label}</p>
+              <p style={{ fontSize: 30, fontWeight: 800, color: item.color }}>{$(item.amt)}</p>
+              <p style={{ fontSize: 11, color: T.dim, marginTop: 4 }}>{item.note}</p>
+            </Card>
+          )
+        )}
+      </div>
+
+      <Card style={{ background: D.deficit >= 0 ? T.greenBg : T.coralBg, border:`1px solid ${D.deficit >= 0 ? T.greenMid : T.coralMid}`, textAlign:'center', padding:'28px', marginBottom: 16 }}>
+        <p style={{ fontSize: 13, color: T.dim, marginBottom: 4 }}>Estimated monthly {D.deficit >= 0 ? 'surplus' : 'deficit'}</p>
+        <p style={{ fontSize: 56, fontWeight: 800, color: D.deficit >= 0 ? T.green : T.coral, letterSpacing: -1 }}>{D.deficit >= 0 ? '+' : '−'}{$(Math.abs(D.deficit))}</p>
+        <p style={{ fontSize: 14, color: T.dim, marginTop: 8, maxWidth: 500, margin:'10px auto 0', lineHeight: 1.6 }}>
+          {D.deficit >= 0
+            ? `We're in surplus territory when all income is counted. The ORDO and Baselane funds ($1k each) are intentionally kept in those accounts — right now being used to make monthly CC payments. That strategy is working; the question tonight is how to optimize it.`
+            : `This is why the Groceries account runs dry. Two spending categories are almost entirely responsible for the gap.`
+          }
+        </p>
+      </Card>
+
+      <Card>
+        <p style={{ fontWeight: 700, marginBottom: 14 }}>Monthly income breakdown</p>
+        {sources.map(s => (
+          <div key={s.label} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0', borderBottom:`1px solid ${T.border}` }}>
+            <div>
+              <p style={{ fontSize: 14, fontWeight: 500 }}>{s.label}</p>
+              <p style={{ fontSize: 12, color: T.dim }}>{s.acct} account · {s.when}{s.note ? ` · ${s.note}` : ''}</p>
+            </div>
+            <p style={{ fontSize: 17, fontWeight: 700, color: T.green }}>{$(s.amt)}</p>
+          </div>
+        ))}
+        <div style={{ display:'flex', justifyContent:'space-between', paddingTop: 12, marginTop: 4 }}>
+          <span style={{ fontWeight: 700 }}>Total monthly take-home</span>
+          <span style={{ fontSize: 20, fontWeight: 800, color: T.green }}>{$(total)}</span>
+        </div>
+      </Card>
+    </div>
+  );
+};
+
+// ─── SCREEN 3: SPENDING ───────────────────────────────────────────────────────
+const Spending = () => {
+  const [amazon, setAmazon] = useState(1483);
+  const [ddOrders, setDdOrders] = useState(10);
+  const amazonSave = 1483 - amazon;
+  const ddSave = Math.round((10 - ddOrders) * 47);
+  const newDeficit = D.deficit + amazonSave + ddSave;
+
+  return (
+    <div style={{ padding:'32px 48px', maxWidth: 920, margin:'0 auto' }}>
+      <SectionHeader tag="Spending Reality" tagColor="red" title="The Honest Truth" sub="Two categories explain almost all of our monthly gap." />
+
+      <Card style={{ marginBottom: 16 }}>
+        <p style={{ fontWeight: 700, marginBottom: 16 }}>Variable spending — monthly averages (YTD)</p>
+        {D.spending.map(s => (
+          <div key={s.cat} style={{ marginBottom: 14 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', marginBottom: 5 }}>
+              <div style={{ display:'flex', alignItems:'center', gap: 8 }}>
+                <span style={{ fontSize: 14, fontWeight: 600 }}>{s.cat}</span>
+                {s.lever && <span style={{ fontSize: 11, background: T.amberBg, color: T.amber, borderRadius: 100, padding:'2px 8px', fontWeight: 700 }}>adjustable</span>}
+              </div>
+              <span style={{ fontSize: 16, fontWeight: 700 }}>{$(s.mo)}/mo</span>
+            </div>
+            <Bar val={s.mo} max={1600} color={s.color} />
+            <p style={{ fontSize: 11, color: T.dim, marginTop: 3 }}>{s.note}</p>
+          </div>
+        ))}
+        <div style={{ borderTop:`1px solid ${T.border}`, marginTop: 8, paddingTop: 12, display:'flex', justifyContent:'space-between' }}>
+          <span style={{ fontWeight: 700 }}>Total variable (avg)</span>
+          <span style={{ fontSize: 18, fontWeight: 800, color: T.coral }}>{$(D.variableSpend)}/mo</span>
+        </div>
+      </Card>
+
+      <Card style={{ background: T.greenBg, border:`1px solid ${T.greenMid}`, marginBottom: 16 }}>
+        <p style={{ fontWeight: 700, marginBottom: 4 }}>🎛️ What if you adjusted just these two things?</p>
+        <p style={{ fontSize: 13, color: T.dim, marginBottom: 20 }}>Drag the sliders — the monthly math updates live.</p>
+        <div style={{ display:'flex', flexDirection:'column', gap: 22 }}>
+          <RangeSlider label="Monthly Amazon cap" min={400} max={1483} step={50} value={amazon} onChange={setAmazon} color={T.amber} />
+          <RangeSlider label="DoorDash orders per month" min={0} max={15} step={1} value={ddOrders} onChange={setDdOrders} fmt={v=>`${v} orders`} color={T.amber} />
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap: 12, marginTop: 22, paddingTop: 18, borderTop:`1px solid ${T.greenMid}` }}>
+          <div style={{ textAlign:'center' }}>
+            <p style={{ fontSize: 11, color: T.dim }}>Amazon savings</p>
+            <p style={{ fontSize: 24, fontWeight: 800, color: amazonSave > 0 ? T.green : T.dim }}>{amazonSave > 0 ? `+${$(amazonSave)}` : $(0)}/mo</p>
+          </div>
+          <div style={{ textAlign:'center' }}>
+            <p style={{ fontSize: 11, color: T.dim }}>DoorDash savings</p>
+            <p style={{ fontSize: 24, fontWeight: 800, color: ddSave > 0 ? T.green : T.dim }}>{ddSave > 0 ? `+${$(ddSave)}` : $(0)}/mo</p>
+          </div>
+          <div style={{ textAlign:'center', background: newDeficit >= 0 ? T.greenBg : T.coralBg, borderRadius: 12, padding:'10px 0', border:`1px solid ${newDeficit >= 0 ? T.greenMid : T.coralMid}` }}>
+            <p style={{ fontSize: 11, color: T.dim }}>New monthly {newDeficit >= 0 ? 'surplus' : 'deficit'}</p>
+            <p style={{ fontSize: 24, fontWeight: 800, color: newDeficit >= 0 ? T.green : T.coral }}>{newDeficit >= 0 ? '+' : '−'}{$(Math.abs(newDeficit))}</p>
+          </div>
+        </div>
+      </Card>
+
+      <Card style={{ background: T.coralBg, border:`1px solid ${T.coralMid}` }}>
+        <p style={{ fontSize: 13, fontWeight: 700, color: T.coral, marginBottom: 5 }}>⚠️ Also worth knowing: overdraft fees</p>
+        <p style={{ fontSize: 14, lineHeight: 1.7 }}>
+          Our Groceries account racked up <strong>13 overdraft fees this year — $195 total</strong>. It’s not a spending problem, it’s a routing problem. One proactive transfer of $1,200 to Groceries on the 1st of each month eliminates this immediately.
+        </p>
+      </Card>
+    </div>
+  );
+};
+
+// ─── SCREEN 4: DEBT ───────────────────────────────────────────────────────────
+const Debt = () => {
+  const [extra, setExtra] = useState(500);
+  const sapphireBase = D.accounts.sapphire - 1000;
+  const inkBase = D.accounts.ink;
+  const sapphireMos = Math.ceil(sapphireBase / extra);
+  const inkMos = Math.ceil(inkBase / extra);
+  const total = sapphireMos + inkMos;
+
+  return (
+    <div style={{ padding:'32px 48px', maxWidth: 920, margin:'0 auto' }}>
+      <SectionHeader tag="Pay Down Debt" tagColor="red" title="Crushing the Credit Cards" sub="We’re close to a $1,000 windfall. Here’s how to use it." />
+
+      <Card style={{ background:'linear-gradient(135deg, #173528 0%, #265842 100%)', border:'none', color:'#fff', padding:'28px 32px', marginBottom: 16 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <div>
+            <p style={{ fontSize: 12, opacity:.6, letterSpacing:1, marginBottom: 6 }}>CHASE SAPPHIRE SIGNUP BONUS</p>
+            <p style={{ fontSize: 26, fontWeight: 800 }}>$1,000 cash back — almost ours</p>
+            <p style={{ fontSize: 14, opacity:.75, marginTop: 6 }}>~$2,208 more in spend triggers it. At April's pace: days away.</p>
+          </div>
+          <div style={{ textAlign:'right', flexShrink: 0, marginLeft: 20 }}>
+            <p style={{ fontSize: 44, fontWeight: 800 }}>72%</p>
+            <p style={{ fontSize: 11, opacity:.6 }}>of $8,000 reached</p>
+          </div>
+        </div>
+        <div style={{ marginTop: 16, background:'rgba(255,255,255,0.12)', borderRadius: 6, height: 10, overflow:'hidden' }}>
+          <div style={{ width:'72%', height:'100%', background:'#7FD4A8', borderRadius: 6 }} />
+        </div>
+        <p style={{ fontSize: 12, opacity:.6, marginTop: 6 }}>Decision to make: apply the $1,000 to the balance, or bank it for the passport trip fund?</p>
+      </Card>
+
+      <Card style={{ marginBottom: 16 }}>
+        <p style={{ fontWeight: 700, marginBottom: 4 }}>Payoff simulator — Sapphire first, then roll into Ink</p>
+        <p style={{ fontSize: 13, color: T.dim, marginBottom: 20 }}>After bonus: Sapphire is at ~{$(sapphireBase)}. How fast can we knock it out?</p>
+        <RangeSlider label="Extra monthly payment toward CC debt" min={200} max={1500} step={50} value={extra} onChange={setExtra} fmt={v=>`${$(v)}/mo`} color={T.green} />
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap: 12, marginTop: 22 }}>
+          <div style={{ textAlign:'center', background: T.coralBg, borderRadius: 14, padding:'18px 10px' }}>
+            <p style={{ fontSize: 11, color: T.dim, marginBottom: 4 }}>Sapphire paid off</p>
+            <p style={{ fontSize: 30, fontWeight: 800, color: T.coral }}>{sapphireMos} mo</p>
+            <p style={{ fontSize: 12, color: T.dim, marginTop: 4 }}>Starting at {$(sapphireBase)}</p>
+          </div>
+          <div style={{ textAlign:'center', background: T.amberBg, borderRadius: 14, padding:'18px 10px' }}>
+            <p style={{ fontSize: 11, color: T.dim, marginBottom: 4 }}>Ink paid off</p>
+            <p style={{ fontSize: 30, fontWeight: 800, color: T.amber }}>{inkMos} mo later</p>
+            <p style={{ fontSize: 12, color: T.dim, marginTop: 4 }}>Roll the full payment in</p>
+          </div>
+          <div style={{ textAlign:'center', background: T.greenBg, borderRadius: 14, padding:'18px 10px', border:`1px solid ${T.greenMid}` }}>
+            <p style={{ fontSize: 11, color: T.dim, marginBottom: 4 }}>Debt-free by</p>
+            <p style={{ fontSize: 18, fontWeight: 800, color: T.green, lineHeight: 1.2 }}>{monthsAhead(total)}</p>
+            <p style={{ fontSize: 12, color: T.dim, marginTop: 4 }}>{total} months total</p>
+          </div>
+        </div>
+      </Card>
+
+      <Card>
+        <p style={{ fontWeight: 700, marginBottom: 14 }}>Current balances</p>
+        {[
+          { name:'Chase Sapphire', bal: D.accounts.sapphire, limit: 10000, note: `$1k bonus pending — redeem for travel or pay down balance?` },
+          { name:'Chase Ink', bal: D.accounts.ink, limit: 5000, note: null },
+        ].map(c => (
+          <div key={c.name} style={{ marginBottom: 16 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', marginBottom: 5 }}>
+              <div>
+                <p style={{ fontSize: 14, fontWeight: 600 }}>{c.name}</p>
+                {c.note && <p style={{ fontSize: 12, color: T.green, fontWeight: 600 }}>{c.note}</p>}
+              </div>
+              <p style={{ fontSize: 18, fontWeight: 800, color: T.coral }}>{$$(c.bal)}</p>
+            </div>
+            <Bar val={c.bal} max={c.limit} color={T.coral} h={10} />
+            <p style={{ fontSize: 11, color: T.dim, marginTop: 3 }}>{$$(c.limit - c.bal)} available · {Math.round((c.bal/c.limit)*100)}% utilization</p>
+          </div>
+        ))}
+      </Card>
+    </div>
+  );
+};
+
+// ─── SCREEN 5: GOALS ─────────────────────────────────────────────────────────
+const Goals = () => {
+  const [monthly, setMonthly] = useState(400);
+
+  return (
+    <div style={{ padding:'32px 48px', maxWidth: 920, margin:'0 auto' }}>
+      <SectionHeader tag="Our Goals" tagColor="green" title="What We’re Building Toward" sub="The reason all the hard work matters." />
+
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap: 16, marginBottom: 20 }}>
+        {D.goals.map(g => {
+          const pct = Math.round((g.saved / g.target) * 100);
+          const remaining = g.target - g.saved;
+          const perGoal = Math.round(monthly / D.goals.length);
+          const mos = perGoal > 0 ? Math.ceil(remaining / perGoal) : null;
+          const barColor = pct >= 70 ? T.green : pct >= 35 ? T.amber : T.coral;
+          return (
+            <Card key={g.name}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom: 12 }}>
+                <div>
+                  <span style={{ fontSize: 28 }}>{g.icon}</span>
+                  <p style={{ fontSize: 17, fontWeight: 700, marginTop: 6 }}>{g.name}</p>
+                  <p style={{ fontSize: 12, color: T.dim }}>{g.note}</p>
+                </div>
+                <span style={{ fontWeight: 800, fontSize: 15, color: barColor }}>{pct}%</span>
+              </div>
+              <Bar val={g.saved} max={g.target} color={barColor} h={10} />
+              <div style={{ display:'flex', justifyContent:'space-between', marginTop: 8, fontSize: 13 }}>
+                <span style={{ color: T.green, fontWeight: 700 }}>{$(g.saved)} saved</span>
+                <span style={{ color: T.dim }}>target: {$(g.target)}</span>
+              </div>
+              <div style={{ marginTop: 10, background:'#F8F6F2', borderRadius: 10, padding:'10px 12px' }}>
+                <p style={{ fontSize: 12, color: T.dim }}>
+                  {mos ? <>At {$(perGoal)}/mo → <strong style={{ color: T.ink }}>{monthsAhead(mos)}</strong></> : 'Set a monthly contribution below'}
+                </p>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+
+      <Card style={{ background: T.greenBg, border:`1px solid ${T.greenMid}` }}>
+        <p style={{ fontWeight: 700, marginBottom: 4 }}>🎛️ Monthly contribution toward all goals</p>
+        <p style={{ fontSize: 13, color: T.dim, marginBottom: 18 }}>Split evenly across all four — the timeline cards above update automatically.</p>
+        <RangeSlider label="Total monthly toward goals (split 4 ways)" min={0} max={1600} step={50} value={monthly} onChange={setMonthly} fmt={v=>`${$(v)}/mo`} color={T.green} />
+        <p style={{ fontSize: 12, color: T.dim, marginTop: 10 }}>That's {$(Math.round(monthly/4))}/mo per goal. Want to weight them differently? That’s a great conversation for tonight.</p>
+      </Card>
+    </div>
+  );
+};
+
+// ─── SCREEN 6: BIG DECISIONS ─────────────────────────────────────────────────
+const BigDecisions = () => {
+  const [active, setActive] = useState(0);
+  const [salary, setSalary] = useState(107000);
+
+  const takeHome = Math.round(salary * 0.73 / 12);
+  const delta = takeHome - D.income.total;
+
+  const topics = [
+    {
+      icon:'🚐', title:'The Minivan', sub:'Car reorganization in the next 12 months',
+      numbers:[
+        { lbl:'Current car loan payments', val:'$371/mo', note:'OnPoint CCU $306 + PSCCU $65' },
+        { lbl:'Typical used minivan payment', val:'~$400–500/mo', note:'~$25–35k financed at ~7% / 60mo' },
+        { lbl:'GEICO auto insurance', val:'$368/mo', note:'Will change with new vehicle' },
+        { lbl:'Target timeline', val:'12 months', note:'Builds room to save a down payment' },
+      ],
+      insight: "The net monthly impact depends on which cars go away. If you trade in and eliminate the $371 in current loan payments, a minivan payment could cost you almost nothing extra. The 12-month runway is realistic — it gives you time to build a down payment and let the credit picture strengthen.",
+      q: "Which cars are we keeping vs. trading in? What can we realistically put down?"
+    },
+    {
+      icon:'👶', title:'Baby #3', sub:'Planning for another child + medical savings',
+      numbers:[
+        { lbl:'New Baby goal — saved so far', val:'$2,000', note:'25% toward $8,000 target' },
+        { lbl:'Still needed', val:'$6,000', note:'Medical, recovery buffer, supplies' },
+        { lbl:'Typical out-of-pocket birth cost', val:'$3,000–7,000', note:'Depends heavily on plan & deductible' },
+        { lbl:'Current Kaiser premium', val:'$27/mo', note:'Very low — likely employer-sponsored' },
+      ],
+      insight: "You're 25% there. At $300/mo dedicated to just this goal, you'd have $8k by late 2027. If the timeline is sooner, this needs to be the acceleration priority — and knowing your out-of-pocket maximum under Kaiser is the most important single number to find out.",
+      q: "What's our rough timeline for baby #3? And what's our actual out-of-pocket max under Kaiser?"
+    },
+    {
+      icon:'✈️', title:'Passport Trip', sub:"The kids' first international adventure — this year",
+      numbers:[
+        { lbl:'Travel & Fun Money — saved', val:'$0', note:'Target: $2,000' },
+        { lbl:'Kids passport cost', val:'~$330 total', note:'~$165/child, first-time U.S. passports' },
+        { lbl:'Mexico/Caribbean family trip', val:'$3,000–5,000', note:'All-inclusive options help budget' },
+        { lbl:'Europe family trip', val:'$6,000–10,000+', note:'More realistic for a future year' },
+      ],
+      insight: "\"This year\" is doable if you pick the right destination and treat it as a monthly savings line item now. $300/mo from May puts you at $2,400 by December — enough for passports and a budget beach trip. The passport applications need 6–8 weeks, so sooner is better.",
+      q: "What kind of trip are we imagining? Beach/resort or something more adventurous?"
+    },
+    {
+      icon:'🏫', title:'School & Extracurriculars', sub:"Understanding what you can afford for the kids",
+      numbers:[
+        { lbl:'Current Groove Nation Dance', val:'$282/mo', note:'$242 billing + $40 groceries acct' },
+        { lbl:'Current Brightwheel childcare', val:'$366/mo', note:'Both kids, varies slightly' },
+        { lbl:'Education subscriptions', val:'~$97/mo', note:'IXL, CodeMonkey, Scribd' },
+        { lbl:'Private school range (PNW)', val:'$500–1,500/mo', note:'Per child — depends heavily on school' },
+      ],
+      insight: "You're already spending ~$745/mo on kids' activities and education — that's real investment. Adding private school at even the low end means $1,000+ more per month, which is only sustainable once you've closed the monthly deficit and built some breathing room. Fix the cash flow first, then have this conversation with real numbers.",
+      q: "Is this for one child or both? Is fall 2026 the target, or further out?"
+    },
+    {
+      icon:'💼', title:'Job Search', sub:"What salary do you actually need — and want",
+      numbers:[
+        { lbl:'Current monthly take-home', val:'~$6,680', note:'Chad + Joelle combined' },
+        { lbl:'Break-even (close the deficit)', val:'+$920/mo', note:'~$107k → ~$122k gross (Chad only)' },
+        { lbl:'Comfortable (goals + debt payoff)', val:'+$1,800/mo', note:'~$122k → ~$137k gross (Chad only)' },
+        { lbl:'Joelle income factor', val:'Variable', note:'More hours at Premier NW = faster impact' },
+      ],
+      insight: "The conversation isn't just salary — it's total compensation. A job with better health coverage than your current $27/mo Kaiser, strong 401k match, and no commute costs could be worth $5–10k more per year in real money. The salary calculator to the right shows take-home impact.",
+      q: "What's total comp at Barrett & Co. including benefits? That's the honest baseline.",
+      calc: true,
+    },
+  ];
+
+  const t = topics[active];
+
+  return (
+    <div style={{ padding:'32px 48px', maxWidth: 920, margin:'0 auto' }}>
+      <SectionHeader tag="Big Decisions" tagColor="amber" title="What's on the Table" sub="Five big topics — our numbers, one at a time." />
+
+      <div style={{ display:'flex', gap: 8, marginBottom: 20, flexWrap:'wrap' }}>
+        {topics.map((tp, i) => (
+          <button key={i} onClick={() => setActive(i)} style={{
+            background: i === active ? T.ink : T.card,
+            color: i === active ? '#fff' : T.dim,
+            border: `1px solid ${i === active ? T.ink : T.border}`,
+            borderRadius: 100, padding:'7px 18px', fontSize: 13, fontWeight: 600, cursor:'pointer', transition:'all .15s'
+          }}>{tp.icon} {tp.title}</button>
+        ))}
+      </div>
+
+      <Card style={{ marginBottom: 14 }}>
+        <h3 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>{t.icon} {t.title}</h3>
+        <p style={{ color: T.dim, fontSize: 14, marginBottom: 18 }}>{t.sub}</p>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap: 10 }}>
+          {t.numbers.map(n => (
+            <div key={n.lbl} style={{ background:'#F8F6F2', borderRadius: 12, padding:'14px 16px' }}>
+              <p style={{ fontSize: 12, color: T.dim, marginBottom: 4 }}>{n.lbl}</p>
+              <p style={{ fontSize: 20, fontWeight: 800 }}>{n.val}</p>
+              <p style={{ fontSize: 11, color: T.dim, marginTop: 3 }}>{n.note}</p>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {t.calc && (
+        <Card style={{ marginBottom: 14, background: T.amberBg, border:`1px solid ${T.amberMid}` }}>
+          <p style={{ fontWeight: 700, marginBottom: 4 }}>🧮 Salary calculator</p>
+          <p style={{ fontSize: 13, color: T.dim, marginBottom: 18 }}>What would a raise or new job actually put in our pocket each month?</p>
+          <RangeSlider label="Chad's gross annual salary" min={80000} max={200000} step={5000} value={salary} onChange={setSalary} fmt={v=>`${$(v)}/yr`} color={T.amber} />
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap: 10, marginTop: 18 }}>
+            <div style={{ textAlign:'center', background:'#fff', borderRadius: 12, padding:'14px 8px' }}>
+              <p style={{ fontSize: 11, color: T.dim }}>Est. monthly take-home</p>
+              <p style={{ fontSize: 22, fontWeight: 800 }}>{$(takeHome)}</p>
+              <p style={{ fontSize: 11, color: T.dim }}>~73% of gross</p>
+            </div>
+            <div style={{ textAlign:'center', background:'#fff', borderRadius: 12, padding:'14px 8px' }}>
+              <p style={{ fontSize: 11, color: T.dim }}>vs. today</p>
+              <p style={{ fontSize: 22, fontWeight: 800, color: delta >= 0 ? T.green : T.coral }}>{delta >= 0 ? '+' : ''}{$(delta)}/mo</p>
+              <p style={{ fontSize: 11, color: T.dim }}>household change</p>
+            </div>
+            <div style={{ textAlign:'center', background: delta >= 420 ? T.greenBg : T.coralBg, borderRadius: 12, padding:'14px 8px', border:`1px solid ${delta >= 420 ? T.greenMid : T.coralMid}` }}>
+              <p style={{ fontSize: 11, color: T.dim }}>Acceleration status</p>
+              <p style={{ fontSize: 14, fontWeight: 800, color: delta >= 1500 ? T.green : delta >= 420 ? T.amber : T.coral }}>{delta >= 1500 ? '✓ Goals fully funded' : delta >= 420 ? '✓ Covers goals' : '✗ Below goals target'}</p>
+              <p style={{ fontSize: 11, color: T.dim, marginTop: 3 }}>+$420/mo from Chad covers $1,500/mo goals budget</p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      <Card style={{ background: T.greenBg, border:`1px solid ${T.greenMid}`, marginBottom: 14 }}>
+        <p style={{ fontSize: 13, fontWeight: 700, color: T.green, marginBottom: 6 }}>💡 The take</p>
+        <p style={{ fontSize: 14, lineHeight: 1.75, color: T.ink }}>{t.insight}</p>
+      </Card>
+
+      <Card style={{ background: T.amberBg, border:`1px solid ${T.amberMid}` }}>
+        <p style={{ fontSize: 13, fontWeight: 700, color: T.amber, marginBottom: 6 }}>🗣️ Good question for tonight</p>
+        <p style={{ fontSize: 16, fontWeight: 500, lineHeight: 1.5, color: T.ink }}>"{t.q}"</p>
+      </Card>
+    </div>
+  );
+};
+
+// ─── SCREEN 7: UPCOMING CHANGES ──────────────────────────────────────────────
+const SMART_BULLETINS = [
+  { icon:'🎄', month:'December 2026', headline:'Holiday season is 8 months out', body:'Christmas, gifts, travel, and December parties will push spending up. Starting a holiday fund now at even $100/mo means $800 set aside before November hits.' },
+  { icon:'💳', month:'~Nov 2026', headline:'Ink card on track to be paid off', body:'At your current payoff pace, the Chase Ink (~$2,106) could be zeroed out by late 2026 — freeing roughly $300/mo in payment obligations. Plan now for where that money goes.' },
+  { icon:'🏫', month:'May 2026', headline:'Brightwheel tuition is doubling', body:"Levi's enrollment means childcare goes from ~$366 to ~$732/mo starting next month. This is a $366/mo increase to budget for — it hits the Billing account directly." },
+  { icon:'💰', month:'This week', headline:'Sapphire $1,000 bonus incoming', body:'Spending threshold is nearly met. Decision ready to make: apply to Sapphire balance (fastest debt payoff) or redeem for travel (passport trip fund boost). Talk it through now.' },
+  { icon:'🏠', month:'Q3 2026', headline:'Property tax account is funded', body:'$2,400.67 sitting in the dedicated property tax account. Confirm the next bill timing with your lender so you know exactly when it draws and whether the balance is sufficient.' },
+];
+
+const UpcomingChanges = () => {
+  const [notes, setNotes] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('moneydate_upcoming_notes') || '["","","","",""]'); }
+    catch { return ['','','','','']; }
+  });
+
+  const updateNote = (i, val) => {
+    const next = [...notes];
+    next[i] = val;
+    setNotes(next);
+    localStorage.setItem('moneydate_upcoming_notes', JSON.stringify(next));
+  };
+
+  return (
+    <div style={{ padding:'32px 48px', maxWidth: 920, margin:'0 auto' }}>
+      <SectionHeader tag="What's Coming" tagColor="amber" title="Upcoming Changes" sub="Things to have on our radar before the next money date." />
+
+      <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: 1.2, textTransform:'uppercase', color: T.dim, marginBottom: 14 }}>On the horizon</p>
+      <div style={{ display:'flex', flexDirection:'column', gap: 10, marginBottom: 32 }}>
+        {SMART_BULLETINS.map((b, i) => (
+          <div key={i} style={{ display:'flex', gap: 16, background: T.card, border:`1px solid ${T.border}`, borderRadius: 16, padding:'18px 20px' }}>
+            <div style={{ fontSize: 28, flexShrink:0, lineHeight:1, marginTop:2 }}>{b.icon}</div>
+            <div style={{ flex:1 }}>
+              <div style={{ display:'flex', alignItems:'baseline', gap: 10, marginBottom: 5 }}>
+                <p style={{ fontSize: 15, fontWeight: 700 }}>{b.headline}</p>
+                <span style={{ fontSize: 11, fontWeight: 700, color: T.amber, background: T.amberBg, borderRadius: 100, padding:'2px 10px', flexShrink:0 }}>{b.month}</span>
+              </div>
+              <p style={{ fontSize: 13, color: T.dim, lineHeight: 1.6 }}>{b.body}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: 1.2, textTransform:'uppercase', color: T.dim, marginBottom: 6 }}>Things to remember</p>
+      <p style={{ fontSize: 13, color: T.dim, marginBottom: 14 }}>Not action items — just thoughts, context, or reminders you want to carry to the next session.</p>
+      <div style={{ display:'flex', flexDirection:'column', gap: 8, marginBottom: 28 }}>
+        {notes.map((n, i) => (
+          <div key={i} style={{ display:'flex', alignItems:'flex-start', gap: 12, background: T.card, border:`1px solid ${T.border}`, borderRadius: 14, padding:'12px 16px' }}>
+            <span style={{ fontSize: 13, color: T.border, fontWeight: 800, marginTop: 9, flexShrink:0 }}>{i+1}</span>
+            <textarea
+              value={n}
+              onChange={e => updateNote(i, e.target.value)}
+              placeholder="Type a reminder, thought, or context note..."
+              rows={2}
+              style={{ flex:1, border:'none', outline:'none', resize:'none', fontFamily:'inherit', fontSize:14, color: T.ink, background:'transparent', lineHeight:1.5, padding:'4px 0' }}
+            />
+          </div>
+        ))}
+      </div>
+
+      <Card style={{ background:'linear-gradient(135deg, #173528 0%, #265842 100%)', border:'none', color:'#fff', textAlign:'center', padding:'36px' }}>
+        <p style={{ fontSize: 36, marginBottom: 10 }}>🎉</p>
+        <p style={{ fontFamily:"'Playfair Display', serif", fontSize: 26, fontWeight: 700, marginBottom: 10 }}>You showed up. That's everything.</p>
+        <p style={{ fontSize: 14, opacity:.75, maxWidth: 520, margin:'0 auto', lineHeight: 1.7 }}>
+          Most families never have this conversation. We did. Schedule our next money date now — 30 minutes of data, 30 minutes of strategy, every session. That's the system.
+        </p>
+      </Card>
+    </div>
+  );
+};
+
+// ─── MOBILE DETECTION ────────────────────────────────────────────────────────
+const useIsMobile = () => {
+  const [mobile, setMobile] = useState(() => window.innerWidth < 768);
+  useEffect(() => {
+    const h = () => setMobile(window.innerWidth < 768);
+    window.addEventListener('resize', h);
+    return () => window.removeEventListener('resize', h);
+  }, []);
+  return mobile;
+};
+
+// ─── SHARED LIST STATE HELPERS ────────────────────────────────────────────────
+const loadListItems = () => { try { return JSON.parse(localStorage.getItem('moneydate_list') || '{"chad":[],"joelle":[]}'); } catch { return { chad:[], joelle:[] }; } };
+const loadPriorities = () => { try { return JSON.parse(localStorage.getItem('moneydate_priorities') || '["","",""]'); } catch { return ['','','']; } };
+const loadNotesList = () => { try { return JSON.parse(localStorage.getItem('moneydate_notes_list') || '[]'); } catch { return []; } };
+
+// ─── OUR LISTS SCREEN (mobile-first, replaces familylists app) ───────────────
+const OurListsScreen = () => {
+  const mobile = useIsMobile();
+  const [tab, setTab] = useState('chad');
+  const [items, setItems] = useState(loadListItems);
+  const [priorities, setPriorities] = useState(loadPriorities);
+  const [notesList, setNotesList] = useState(loadNotesList);
+  const [input, setInput] = useState('');
+  const [noteInput, setNoteInput] = useState('');
+
+  const saveItems = (next) => { setItems(next); localStorage.setItem('moneydate_list', JSON.stringify(next)); };
+  const savePriorities = (next) => { setPriorities(next); localStorage.setItem('moneydate_priorities', JSON.stringify(next)); };
+  const saveNotes = (next) => { setNotesList(next); localStorage.setItem('moneydate_notes_list', JSON.stringify(next)); };
+
+  const add = () => { const t = input.trim(); if (!t || (tab !== 'chad' && tab !== 'joelle')) return; saveItems({ ...items, [tab]: [...items[tab], { text:t, done:false, id:Date.now() }] }); setInput(''); };
+  const toggle = (p, id) => saveItems({ ...items, [p]: items[p].map(i => i.id===id ? {...i, done:!i.done} : i) });
+  const remove = (p, id) => saveItems({ ...items, [p]: items[p].filter(i => i.id!==id) });
+  const updatePriority = (i, val) => { const n=[...priorities]; n[i]=val; savePriorities(n); };
+  const addNote = () => { const t=noteInput.trim(); if(!t) return; saveNotes([...notesList, {text:t, id:Date.now()}]); setNoteInput(''); };
+  const removeNote = (id) => saveNotes(notesList.filter(n=>n.id!==id));
+
+  const allTotal = items.chad.length + items.joelle.length;
+  const allDone = items.chad.filter(i=>i.done).length + items.joelle.filter(i=>i.done).length;
+
+  const TABS = [
+    { id:'chad', label:'👦 Chad', count: items.chad.length, done: items.chad.filter(i=>i.done).length },
+    { id:'joelle', label:'👩 Joelle', count: items.joelle.length, done: items.joelle.filter(i=>i.done).length },
+    { id:'all', label:'All' },
+    { id:'goals', label:'📌 Goals' },
+  ];
+
+  // ── Mobile layout ──────────────────────────────────────────────────────────
+  if (mobile) {
+    const showInput = tab === 'chad' || tab === 'joelle';
+    const showNoteInput = tab === 'goals';
+    const inputPerson = tab === 'chad' ? 'Chad' : 'Joelle';
+
+    return (
+      <div style={{ display:'flex', flexDirection:'column', height:'100dvh', background:T.cream, overflow:'hidden', position:'fixed', inset:0 }}>
+        {/* Mobile Header */}
+        <div style={{ background:'#fff', borderBottom:`1px solid ${T.border}`, padding:'16px 20px 0', flexShrink:0 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+            <div>
+              <p style={{ fontWeight:800, fontSize:20 }}>💚 Cadence</p>
+              <p style={{ fontSize:12, color:T.dim }}>{allDone}/{allTotal} items done</p>
+            </div>
+            <div style={{ width:80 }}>
+              <Bar val={allDone} max={allTotal||1} color={T.green} h={6} />
+            </div>
+          </div>
+          {/* Tabs */}
+          <div style={{ display:'flex', borderBottom:`1px solid ${T.border}`, marginLeft:-20, marginRight:-20, paddingLeft:20 }}>
+            {TABS.map(t => (
+              <button key={t.id} onClick={()=>setTab(t.id)} style={{
+                background:'none', border:'none', padding:'10px 14px', fontSize:14, fontWeight:700,
+                color: tab===t.id ? T.ink : T.dim, cursor:'pointer', flexShrink:0,
+                borderBottom:`3px solid ${tab===t.id ? T.green : 'transparent'}`, transition:'color .15s'
+              }}>
+                {t.label}
+                {t.count > 0 && <span style={{ marginLeft:5, fontSize:11, color: t.done===t.count ? T.green : T.dim }}>({t.done}/{t.count})</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Scrollable content */}
+        <div style={{ flex:1, overflowY:'auto', padding:'12px 16px', WebkitOverflowScrolling:'touch' }}>
+
+          {/* Chad / Joelle tabs */}
+          {(tab==='chad' || tab==='joelle') && (
+            <div style={{ paddingBottom: showInput ? 90 : 24 }}>
+              {items[tab].length === 0 && (
+                <div style={{ textAlign:'center', padding:'60px 20px', color:T.dim }}>
+                  <p style={{ fontSize:40, marginBottom:12 }}>✅</p>
+                  <p style={{ fontSize:16, fontWeight:600 }}>All clear!</p>
+                  <p style={{ fontSize:14, marginTop:4 }}>Add something below</p>
+                </div>
+              )}
+              {items[tab].map(item => (
+                <div key={item.id} style={{ display:'flex', alignItems:'center', gap:14, marginBottom:10,
+                  background: item.done ? T.greenBg : '#fff', border:`1px solid ${item.done ? T.greenMid : T.border}`,
+                  borderRadius:16, padding:'16px 18px', minHeight:60, transition:'all .15s' }}>
+                  <div onClick={()=>toggle(tab, item.id)} style={{
+                    width:28, height:28, borderRadius:9, border:`2.5px solid ${item.done ? T.green : '#C8C8CC'}`,
+                    background: item.done ? T.green : 'transparent', flexShrink:0, cursor:'pointer',
+                    display:'flex', alignItems:'center', justifyContent:'center', transition:'all .15s'
+                  }}>
+                    {item.done && <span style={{ color:'#fff', fontSize:14, fontWeight:800, lineHeight:1 }}>✓</span>}
+                  </div>
+                  <p onClick={()=>toggle(tab, item.id)} style={{ flex:1, fontSize:16, color: item.done ? T.dim : T.ink, textDecoration: item.done ? 'line-through' : 'none', lineHeight:1.4, cursor:'pointer' }}>{item.text}</p>
+                  <button onClick={()=>remove(tab, item.id)} style={{ background:'none', border:'none', cursor:'pointer', color:'#C8C8CC', fontSize:22, padding:'0 2px', lineHeight:1, minWidth:32, minHeight:32, display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* All tab */}
+          {tab==='all' && (
+            <div style={{ paddingBottom:24 }}>
+              {['chad','joelle'].map(p => (
+                <div key={p} style={{ marginBottom:24 }}>
+                  <p style={{ fontSize:13, fontWeight:800, letterSpacing:1, textTransform:'uppercase', color:T.dim, marginBottom:10, marginTop:8 }}>{p==='chad'?'👦 Chad':'👩 Joelle'}</p>
+                  {items[p].length === 0 && <p style={{ color:T.dim, fontSize:14, padding:'8px 0' }}>Nothing here yet</p>}
+                  {items[p].map(item => (
+                    <div key={item.id} onClick={()=>toggle(p, item.id)} style={{
+                      display:'flex', alignItems:'center', gap:12, marginBottom:8, cursor:'pointer',
+                      background: item.done ? T.greenBg : '#fff', border:`1px solid ${item.done ? T.greenMid : T.border}`,
+                      borderRadius:14, padding:'14px 16px', minHeight:52
+                    }}>
+                      <div style={{ width:24, height:24, borderRadius:7, border:`2px solid ${item.done ? T.green : '#C8C8CC'}`, background: item.done ? T.green : 'transparent', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                        {item.done && <span style={{ color:'#fff', fontSize:12, fontWeight:800 }}>✓</span>}
+                      </div>
+                      <p style={{ flex:1, fontSize:15, color: item.done ? T.dim : T.ink, textDecoration: item.done ? 'line-through' : 'none' }}>{item.text}</p>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Goals & Notes tab */}
+          {tab==='goals' && (
+            <div style={{ paddingBottom: 100 }}>
+              <p style={{ fontSize:13, fontWeight:800, letterSpacing:1, textTransform:'uppercase', color:T.dim, marginBottom:12, marginTop:8 }}>Our 3 Priorities</p>
+              {priorities.map((p, i) => (
+                <div key={i} style={{ display:'flex', alignItems:'center', gap:12, background: T.greenBg, border:`1px solid ${T.greenMid}`, borderRadius:14, padding:'14px 16px', marginBottom:10 }}>
+                  <span style={{ fontSize:16, fontWeight:800, color:T.green, flexShrink:0, width:24 }}>#{i+1}</span>
+                  <input value={p} onChange={e=>updatePriority(i, e.target.value)} placeholder={`Priority #${i+1}...`}
+                    style={{ flex:1, border:'none', outline:'none', background:'transparent', fontFamily:'inherit', fontSize:16, color:T.ink }} />
+                </div>
+              ))}
+              <p style={{ fontSize:13, fontWeight:800, letterSpacing:1, textTransform:'uppercase', color:T.dim, marginBottom:8, marginTop:20 }}>Notes</p>
+              <p style={{ fontSize:13, color:T.dim, marginBottom:12, lineHeight:1.5 }}>Thoughts, tangents, things to remember — not necessarily actionable.</p>
+              {notesList.map((n, i) => (
+                <div key={n.id} style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'12px 0', borderBottom:`1px solid ${T.border}` }}>
+                  <span style={{ fontSize:14, color:T.dim, marginTop:2, flexShrink:0, width:20 }}>{i+1}.</span>
+                  <p style={{ flex:1, fontSize:15, color:T.ink, lineHeight:1.5 }}>{n.text}</p>
+                  <button onClick={()=>removeNote(n.id)} style={{ background:'none', border:'none', cursor:'pointer', color:'#C8C8CC', fontSize:20, padding:'0 4px', minWidth:32, minHeight:32 }}>×</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Fixed bottom input bar */}
+        {(showInput || showNoteInput) && (
+          <div style={{ background:'#fff', borderTop:`1px solid ${T.border}`, padding:`12px 16px`, paddingBottom:`max(12px, env(safe-area-inset-bottom))`, display:'flex', gap:10, flexShrink:0 }}>
+            <input
+              value={showInput ? input : noteInput}
+              onChange={e => showInput ? setInput(e.target.value) : setNoteInput(e.target.value)}
+              onKeyDown={e => e.key==='Enter' && (showInput ? add() : addNote())}
+              placeholder={showInput ? `Add to ${inputPerson}'s list...` : 'Add a note...'}
+              style={{ flex:1, border:`1.5px solid ${T.border}`, borderRadius:14, padding:'14px 18px', fontSize:16, outline:'none', fontFamily:'inherit', background:T.cream }}
+            />
+            <button onClick={showInput ? add : addNote} style={{ background: showInput ? T.green : T.amber, color:'#fff', border:'none', borderRadius:14, padding:'14px 20px', fontSize:20, fontWeight:800, cursor:'pointer', minWidth:52 }}>+</button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Desktop layout ─────────────────────────────────────────────────────────
+  return (
+    <div style={{ padding:'32px 48px', maxWidth:920, margin:'0 auto' }}>
+      <SectionHeader tag="Our Lists" tagColor="green" title="Cadence Lists" sub="Your shared todos, priorities & notes — accessible from any screen via the ✅ bubble." />
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+        <div style={{ display:'flex', gap:8 }}>
+          {TABS.map(t => (
+            <button key={t.id} onClick={()=>setTab(t.id)} style={{ background: tab===t.id ? T.ink : T.card, color: tab===t.id ? '#fff' : T.dim, border:`1px solid ${tab===t.id ? T.ink : T.border}`, borderRadius:100, padding:'7px 18px', fontSize:13, fontWeight:700, cursor:'pointer' }}>{t.label}{t.count > 0 ? ` (${t.done}/${t.count})` : ''}</button>
+          ))}
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <Bar val={allDone} max={allTotal||1} color={T.green} h={8} />
+          <span style={{ fontSize:13, fontWeight:700, color:T.dim, whiteSpace:'nowrap' }}>{allDone}/{allTotal} done</span>
+        </div>
+      </div>
+
+      {(tab==='chad' || tab==='joelle') && (
+        <>
+          <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:16 }}>
+            {items[tab].length === 0 && <p style={{ color:T.dim, fontSize:14, textAlign:'center', padding:'32px 0' }}>No items yet — add one below</p>}
+            {items[tab].map(item => (
+              <div key={item.id} onClick={()=>toggle(tab, item.id)} style={{
+                display:'flex', alignItems:'center', gap:14, cursor:'pointer',
+                background: item.done ? T.greenBg : T.card, border:`1px solid ${item.done ? T.greenMid : T.border}`,
+                borderRadius:14, padding:'14px 18px', transition:'all .15s'
+              }}>
+                <div style={{ width:22, height:22, borderRadius:7, border:`2px solid ${item.done ? T.green : T.border}`, background: item.done ? T.green : 'transparent', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  {item.done && <span style={{ color:'#fff', fontSize:12, fontWeight:800 }}>✓</span>}
+                </div>
+                <p style={{ flex:1, fontSize:15, color: item.done ? T.dim : T.ink, textDecoration: item.done ? 'line-through' : 'none', lineHeight:1.4 }}>{item.text}</p>
+                <button onClick={e=>{e.stopPropagation(); remove(tab, item.id);}} style={{ background:'none', border:'none', cursor:'pointer', color:T.border, fontSize:18, padding:'0 4px' }}>×</button>
+              </div>
+            ))}
+          </div>
+          <div style={{ display:'flex', gap:10 }}>
+            <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&add()}
+              placeholder={`Add an item for ${tab==='chad'?'Chad':'Joelle'}...`}
+              style={{ flex:1, border:`1px solid ${T.border}`, borderRadius:14, padding:'13px 18px', fontSize:15, outline:'none', fontFamily:'inherit', background:T.card }}
+            />
+            <button onClick={add} style={{ background:T.green, color:'#fff', border:'none', borderRadius:14, padding:'13px 22px', fontSize:18, fontWeight:800, cursor:'pointer' }}>+</button>
+          </div>
+        </>
+      )}
+
+      {tab==='all' && (
+        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+          {['chad','joelle'].map(p => (
+            <div key={p}>
+              <p style={{ fontSize:12, fontWeight:800, letterSpacing:1.2, textTransform:'uppercase', color:T.dim, marginBottom:8 }}>{p==='chad'?'👦 Chad':'👩 Joelle'}</p>
+              {items[p].length === 0 && <p style={{ color:T.dim, fontSize:13, padding:'8px 0 16px' }}>No items</p>}
+              {items[p].map(item => (
+                <div key={item.id} onClick={()=>toggle(p, item.id)} style={{
+                  display:'flex', alignItems:'center', gap:12, cursor:'pointer', marginBottom:6,
+                  background: item.done ? T.greenBg : T.card, border:`1px solid ${item.done ? T.greenMid : T.border}`,
+                  borderRadius:12, padding:'12px 16px', transition:'all .15s'
+                }}>
+                  <div style={{ width:20, height:20, borderRadius:6, border:`2px solid ${item.done ? T.green : T.border}`, background: item.done ? T.green : 'transparent', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                    {item.done && <span style={{ color:'#fff', fontSize:11, fontWeight:800 }}>✓</span>}
+                  </div>
+                  <p style={{ flex:1, fontSize:14, color: item.done ? T.dim : T.ink, textDecoration: item.done ? 'line-through' : 'none' }}>{item.text}</p>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab==='goals' && (
+        <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
+          <div>
+            <p style={{ fontSize:12, fontWeight:800, letterSpacing:1, textTransform:'uppercase', color:T.dim, marginBottom:12 }}>Our 3 Priorities This Month</p>
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {priorities.map((p, i) => (
+                <div key={i} style={{ display:'flex', alignItems:'center', gap:12, background:T.greenBg, border:`1px solid ${T.greenMid}`, borderRadius:14, padding:'14px 18px' }}>
+                  <span style={{ fontSize:15, fontWeight:800, color:T.green, flexShrink:0 }}>#{i+1}</span>
+                  <input value={p} onChange={e=>updatePriority(i, e.target.value)} placeholder={`Priority #${i+1}...`}
+                    style={{ flex:1, border:'none', outline:'none', background:'transparent', fontFamily:'inherit', fontSize:15, color:T.ink }} />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p style={{ fontSize:12, fontWeight:800, letterSpacing:1, textTransform:'uppercase', color:T.dim, marginBottom:8 }}>Session Notes</p>
+            <p style={{ fontSize:13, color:T.dim, marginBottom:12 }}>Thoughts, tangents, things to remember — doesn't have to be budget-related.</p>
+            <div style={{ display:'flex', flexDirection:'column', gap:0 }}>
+              {notesList.map((n, i) => (
+                <div key={n.id} style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'10px 0', borderBottom:`1px solid ${T.border}` }}>
+                  <span style={{ fontSize:13, color:T.dim, marginTop:2, width:20 }}>{i+1}.</span>
+                  <p style={{ flex:1, fontSize:14, color:T.ink, lineHeight:1.5 }}>{n.text}</p>
+                  <button onClick={()=>removeNote(n.id)} style={{ background:'none', border:'none', cursor:'pointer', color:T.border, fontSize:18, padding:'0 4px' }}>×</button>
+                </div>
+              ))}
+            </div>
+            <div style={{ display:'flex', gap:10, marginTop:14 }}>
+              <input value={noteInput} onChange={e=>setNoteInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addNote()}
+                placeholder="Add a note..."
+                style={{ flex:1, border:`1px solid ${T.border}`, borderRadius:14, padding:'12px 18px', fontSize:14, outline:'none', fontFamily:'inherit', background:T.card }} />
+              <button onClick={addNote} style={{ background:T.amber, color:'#fff', border:'none', borderRadius:14, padding:'12px 20px', fontSize:16, fontWeight:800, cursor:'pointer' }}>+</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── PREP MODE ────────────────────────────────────────────────────────────────
+const PrepMode = ({ onExit }) => {
+  const [tab, setTab] = useState('balances');
+  const [acct, setAcct] = useState({ ...D.accounts });
+  const [sources, setSources] = useState(D.income.sources.map((s,i) => ({ ...s, _id: i })));
+  const [fixedBills, setFixedBills] = useState(D.fixedBills);
+  const [spending, setSpending] = useState(D.spending.map((s,i) => ({ ...s, _id: i })));
+  const [upcomingNotes, setUpcomingNotes] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('moneydate_upcoming_notes') || '["","","","",""]'); }
+    catch { return ['','','','','']; }
+  });
+  const [todos, setTodos] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('moneydate_list') || '{"chad":[],"joelle":[]}'); }
+    catch { return { chad:[], joelle:[] }; }
+  });
+  const [rollForward, setRollForward] = useState(true);
+  const [clearNotes, setClearNotes] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const incomeTotal = Math.round(sources.reduce((s, src) => s + (parseFloat(src.amt) || 0), 0));
+  const variableSpend = spending.reduce((s, sp) => s + (parseFloat(sp.mo) || 0), 0);
+  const deficit = incomeTotal - fixedBills - Math.round(variableSpend);
+
+  const updateAcct = (k, v) => setAcct(a => ({ ...a, [k]: parseFloat(v) || 0 }));
+  const updateSource = (id, k, v) => setSources(s => s.map(x => x._id===id ? { ...x, [k]: k==='amt' ? (parseFloat(v)||0) : v } : x));
+  const addSource = () => setSources(s => [...s, { label:'New income source', amt:0, acct:'Billing', when:'Monthly', _id: Date.now() }]);
+  const removeSource = (id) => setSources(s => s.filter(x => x._id !== id));
+  const updateSpend = (id, k, v) => setSpending(s => s.map(x => x._id===id ? { ...x, [k]: k==='mo' ? (parseFloat(v)||0) : v } : x));
+  const toggleTodoDone = (p, id) => setTodos(t => ({ ...t, [p]: t[p].map(i => i.id===id ? { ...i, done:!i.done } : i) }));
+
+  const handleSave = () => {
+    const totalLiquid = Object.entries(acct)
+      .filter(([k]) => ['billing','groceries','propertyTax','emergency','ordoWATB','baselane'].includes(k))
+      .reduce((s,[,v]) => s + v, 0);
+    const totalDebt = (acct.sapphire||0) + (acct.ink||0);
+    const newAcct = { ...acct, totalLiquid: Math.round(totalLiquid*100)/100, totalDebt: Math.round(totalDebt*100)/100, netCash: Math.round((totalLiquid - totalDebt)*100)/100 };
+
+    const newData = {
+      accounts: newAcct,
+      income: { total: incomeTotal, sources: sources.map(({ _id, ...rest }) => rest) },
+      fixedBills,
+      variableSpend: Math.round(variableSpend),
+      deficit,
+      spending: spending.map(({ _id, ...rest }) => rest),
+    };
+    localStorage.setItem('moneydate_data', JSON.stringify(newData));
+    localStorage.setItem('moneydate_upcoming_notes', JSON.stringify(clearNotes ? ['','','','',''] : upcomingNotes));
+
+    if (rollForward) {
+      const mkRoll = arr => arr.filter(i=>!i.done).map(i=>({ ...i, id: Date.now()+Math.random() }));
+      localStorage.setItem('moneydate_list', JSON.stringify({ chad: mkRoll(todos.chad), joelle: mkRoll(todos.joelle) }));
+    } else {
+      localStorage.setItem('moneydate_list', JSON.stringify({ chad:[], joelle:[] }));
+    }
+    setSaved(true);
+    setTimeout(() => window.location.reload(), 900);
+  };
+
+  const chadDone = todos.chad.filter(i=>i.done).length;
+  const joelleDone = todos.joelle.filter(i=>i.done).length;
+  const chadRoll = todos.chad.filter(i=>!i.done).length;
+  const joelleRoll = todos.joelle.filter(i=>!i.done).length;
+
+  const PREP_TABS = [
+    { id:'balances', label:'💰 Balances' },
+    { id:'income', label:'📥 Income' },
+    { id:'bills', label:'🧾 Bills' },
+    { id:'session', label:'✅ Last Session' },
+    { id:'upcoming', label:'📌 Upcoming Notes' },
+  ];
+
+  const fieldStyle = { border:`1px solid ${T.border}`, borderRadius:10, padding:'9px 14px', fontSize:14, fontFamily:'inherit', outline:'none', background:T.card, color:T.ink, width:'100%' };
+  const labelStyle = { fontSize:12, color:T.dim, fontWeight:700, marginBottom:4, display:'block' };
+  const rowStyle = { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0', borderBottom:`1px solid ${T.border}`, gap:12 };
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', height:'100vh', background:T.cream, overflow:'hidden' }}>
+      {/* Header */}
+      <div style={{ background:'#fff', borderBottom:`1px solid ${T.border}`, padding:'14px 40px', display:'flex', alignItems:'center', gap:16, flexShrink:0 }}>
+        <button onClick={onExit} style={{ background:'none', border:`1px solid ${T.border}`, borderRadius:100, padding:'7px 18px', fontSize:13, cursor:'pointer', color:T.dim, fontWeight:600 }}>← Back</button>
+        <div>
+          <p style={{ fontWeight:800, fontSize:18 }}>🔧 Prep Mode</p>
+          <p style={{ fontSize:12, color:T.dim }}>Update data before your next money date session</p>
+        </div>
+        <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:12 }}>
+          {saved && <span style={{ fontSize:13, color:T.green, fontWeight:700 }}>✓ Saved! Reloading…</span>}
+          <button onClick={handleSave} style={{ background: saved ? T.green : T.ink, color:'#fff', border:'none', borderRadius:100, padding:'10px 28px', fontSize:14, fontWeight:700, cursor:'pointer', transition:'all .2s' }}>
+            {saved ? '✓ Done' : 'Save & Apply →'}
+          </button>
+        </div>
+      </div>
+
+      {/* Tab bar */}
+      <div style={{ background:'#fff', borderBottom:`1px solid ${T.border}`, padding:'0 40px', display:'flex', gap:4, flexShrink:0 }}>
+        {PREP_TABS.map(t => (
+          <button key={t.id} onClick={()=>setTab(t.id)} style={{
+            background:'none', border:'none', padding:'12px 16px', fontSize:13, fontWeight:700,
+            color: tab===t.id ? T.ink : T.dim, cursor:'pointer',
+            borderBottom: `3px solid ${tab===t.id ? T.ink : 'transparent'}`, transition:'all .15s'
+          }}>{t.label}</button>
+        ))}
+      </div>
+
+      {/* Content */}
+      <div style={{ flex:1, overflowY:'auto', padding:'32px 40px', maxWidth:860, width:'100%', margin:'0 auto' }}>
+
+        {/* BALANCES */}
+        {tab==='balances' && (
+          <div>
+            <p style={{ fontSize:22, fontWeight:800, marginBottom:6 }}>Account Balances</p>
+            <p style={{ color:T.dim, fontSize:14, marginBottom:24 }}>Update each account to today's actual balance. The Big Picture screen will reflect these immediately.</p>
+
+            <p style={{ fontSize:12, fontWeight:800, letterSpacing:1, textTransform:'uppercase', color:T.dim, marginBottom:12 }}>Liquid Accounts</p>
+            <Card style={{ marginBottom:20 }}>
+              {[
+                { key:'billing', label:'Billing (main checking)' },
+                { key:'groceries', label:'Groceries account' },
+                { key:'propertyTax', label:'Property Tax savings' },
+                { key:'emergency', label:'Emergency Fund' },
+                { key:'ordoWATB', label:'ORDO WATB' },
+                { key:'baselane', label:'Baselane (rental)' },
+              ].map(({ key, label }) => (
+                <div key={key} style={rowStyle}>
+                  <span style={{ fontSize:14, color:T.ink, flex:1 }}>{label}</span>
+                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <span style={{ color:T.dim, fontSize:14 }}>$</span>
+                    <input type="number" step="0.01" value={acct[key]||''} onChange={e=>updateAcct(key, e.target.value)}
+                      style={{ ...fieldStyle, width:120, textAlign:'right' }} />
+                  </div>
+                </div>
+              ))}
+            </Card>
+
+            <p style={{ fontSize:12, fontWeight:800, letterSpacing:1, textTransform:'uppercase', color:T.dim, marginBottom:12 }}>Credit Card Balances</p>
+            <Card style={{ marginBottom:20 }}>
+              {[
+                { key:'sapphire', label:'Chase Sapphire (2575)' },
+                { key:'ink', label:'Chase Ink (0388)' },
+              ].map(({ key, label }) => (
+                <div key={key} style={rowStyle}>
+                  <span style={{ fontSize:14, color:T.ink, flex:1 }}>{label}</span>
+                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <span style={{ color:T.dim, fontSize:14 }}>$</span>
+                    <input type="number" step="0.01" value={acct[key]||''} onChange={e=>updateAcct(key, e.target.value)}
+                      style={{ ...fieldStyle, width:120, textAlign:'right' }} />
+                  </div>
+                </div>
+              ))}
+            </Card>
+
+            <Card style={{ background:T.greenBg, border:`1px solid ${T.greenMid}` }}>
+              <p style={{ fontWeight:700, marginBottom:10 }}>Calculated totals (auto-updated on save)</p>
+              {[
+                ['Total liquid', $(Object.entries(acct).filter(([k])=>['billing','groceries','propertyTax','emergency','ordoWATB','baselane'].includes(k)).reduce((s,[,v])=>s+v,0))],
+                ['Total debt', $(( acct.sapphire||0)+(acct.ink||0))],
+                ['Net cash position', $(Object.entries(acct).filter(([k])=>['billing','groceries','propertyTax','emergency','ordoWATB','baselane'].includes(k)).reduce((s,[,v])=>s+v,0) - (acct.sapphire||0) - (acct.ink||0))],
+              ].map(([lbl, val]) => (
+                <div key={lbl} style={{ display:'flex', justifyContent:'space-between', fontSize:14, padding:'5px 0', borderBottom:`1px solid ${T.greenMid}` }}>
+                  <span style={{ color:T.dim }}>{lbl}</span><span style={{ fontWeight:700 }}>{val}</span>
+                </div>
+              ))}
+            </Card>
+          </div>
+        )}
+
+        {/* INCOME */}
+        {tab==='income' && (
+          <div>
+            <p style={{ fontSize:22, fontWeight:800, marginBottom:6 }}>Income Sources</p>
+            <p style={{ color:T.dim, fontSize:14, marginBottom:24 }}>Add, remove, or update any income source. The cash flow screen totals update automatically.</p>
+            <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:16 }}>
+              {sources.map(s => (
+                <Card key={s._id} style={{ padding:'16px 20px' }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr', gap:12, marginBottom:10 }}>
+                    <div>
+                      <span style={labelStyle}>Source name</span>
+                      <input value={s.label} onChange={e=>updateSource(s._id,'label',e.target.value)} style={fieldStyle} />
+                    </div>
+                    <div>
+                      <span style={labelStyle}>Monthly amount</span>
+                      <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                        <span style={{ color:T.dim }}>$</span>
+                        <input type="number" value={s.amt} onChange={e=>updateSource(s._id,'amt',e.target.value)} style={{ ...fieldStyle, textAlign:'right' }} />
+                      </div>
+                    </div>
+                    <div>
+                      <span style={labelStyle}>Account</span>
+                      <input value={s.acct} onChange={e=>updateSource(s._id,'acct',e.target.value)} style={fieldStyle} />
+                    </div>
+                  </div>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <div style={{ flex:1, marginRight:12 }}>
+                      <span style={labelStyle}>Timing / notes</span>
+                      <input value={s.when||''} onChange={e=>updateSource(s._id,'when',e.target.value)} style={fieldStyle} />
+                    </div>
+                    <button onClick={()=>removeSource(s._id)} style={{ background:T.coralBg, color:T.coral, border:`1px solid ${T.coralMid}`, borderRadius:10, padding:'8px 14px', fontSize:13, cursor:'pointer', fontWeight:700, flexShrink:0, marginTop:18 }}>Remove</button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+            <button onClick={addSource} style={{ background:T.greenBg, color:T.green, border:`1px solid ${T.greenMid}`, borderRadius:12, padding:'11px 20px', fontSize:14, fontWeight:700, cursor:'pointer', marginBottom:20 }}>+ Add income source</button>
+            <Card style={{ background:T.amberBg, border:`1px solid ${T.amberMid}` }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <span style={{ fontWeight:700 }}>New monthly total</span>
+                <span style={{ fontSize:28, fontWeight:800, color:T.green }}>{$(incomeTotal)}/mo</span>
+              </div>
+              {incomeTotal !== DEFAULT_D.income.total && (
+                <p style={{ fontSize:13, color:T.amber, marginTop:8, fontWeight:600 }}>
+                  {incomeTotal > DEFAULT_D.income.total ? '↑' : '↓'} {$(Math.abs(incomeTotal - DEFAULT_D.income.total))} vs. last session
+                </p>
+              )}
+            </Card>
+          </div>
+        )}
+
+        {/* BILLS */}
+        {tab==='bills' && (
+          <div>
+            <p style={{ fontSize:22, fontWeight:800, marginBottom:6 }}>Bills & Spending</p>
+            <p style={{ color:T.dim, fontSize:14, marginBottom:24 }}>Update fixed bill totals and variable spending averages. Edit category amounts directly.</p>
+
+            <Card style={{ marginBottom:20 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                <div>
+                  <p style={{ fontWeight:700, fontSize:16 }}>Total Fixed Bills</p>
+                  <p style={{ fontSize:12, color:T.dim }}>All recurring monthly obligations combined</p>
+                </div>
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <span style={{ color:T.dim }}>$</span>
+                  <input type="number" value={fixedBills} onChange={e=>setFixedBills(parseFloat(e.target.value)||0)}
+                    style={{ ...fieldStyle, width:120, textAlign:'right', fontSize:20, fontWeight:800 }} />
+                </div>
+              </div>
+              <p style={{ fontSize:12, color:T.dim }}>This is the lump sum from your 22 recurring bills. Update it when bills change (e.g. Brightwheel doubling).</p>
+            </Card>
+
+            <p style={{ fontSize:12, fontWeight:800, letterSpacing:1, textTransform:'uppercase', color:T.dim, marginBottom:12 }}>Variable Spending Categories</p>
+            <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:16 }}>
+              {spending.map(s => (
+                <div key={s._id} style={{ ...rowStyle, background:T.card, border:`1px solid ${T.border}`, borderRadius:14, padding:'14px 18px' }}>
+                  <div style={{ flex:1 }}>
+                    <input value={s.cat} onChange={e=>updateSpend(s._id,'cat',e.target.value)}
+                      style={{ border:'none', outline:'none', fontFamily:'inherit', fontSize:14, fontWeight:600, color:T.ink, background:'transparent', width:'100%' }} />
+                    <input value={s.note||''} onChange={e=>updateSpend(s._id,'note',e.target.value)}
+                      style={{ border:'none', outline:'none', fontFamily:'inherit', fontSize:12, color:T.dim, background:'transparent', width:'100%', marginTop:2 }} />
+                  </div>
+                  <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+                    <span style={{ color:T.dim, fontSize:14 }}>$</span>
+                    <input type="number" value={s.mo} onChange={e=>updateSpend(s._id,'mo',e.target.value)}
+                      style={{ ...fieldStyle, width:90, textAlign:'right' }} />
+                    <span style={{ color:T.dim, fontSize:13 }}>/mo</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <Card style={{ background:T.coralBg, border:`1px solid ${T.coralMid}` }}>
+              <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
+                <span style={{ fontWeight:700 }}>Variable total</span>
+                <span style={{ fontSize:22, fontWeight:800, color:T.coral }}>{$(Math.round(variableSpend))}/mo</span>
+              </div>
+              <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
+                <span style={{ color:T.dim }}>Fixed bills</span>
+                <span style={{ fontWeight:700 }}>{$(fixedBills)}/mo</span>
+              </div>
+              <div style={{ display:'flex', justifyContent:'space-between', paddingTop:8, borderTop:`1px solid ${T.coralMid}` }}>
+                <span style={{ fontWeight:700 }}>Monthly {deficit >= 0 ? 'surplus' : 'deficit'}</span>
+                <span style={{ fontSize:20, fontWeight:800, color: deficit >= 0 ? T.green : T.coral }}>{deficit >= 0 ? '+' : '−'}{$(Math.abs(deficit))}</span>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* LAST SESSION */}
+        {tab==='session' && (
+          <div>
+            <p style={{ fontSize:22, fontWeight:800, marginBottom:6 }}>Last Session Recap</p>
+            <p style={{ color:T.dim, fontSize:14, marginBottom:24 }}>Check off what got done. Incomplete items can roll forward into the new session automatically.</p>
+
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:24 }}>
+              {[
+                { name:'Chad', key:'chad', color:T.green, done:chadDone, total:todos.chad.length, roll:chadRoll },
+                { name:'Joelle', key:'joelle', color:T.purple, done:joelleDone, total:todos.joelle.length, roll:joelleRoll },
+              ].map(p => (
+                <Card key={p.key}>
+                  <p style={{ fontWeight:800, fontSize:16, marginBottom:10 }}>{p.name}</p>
+                  <p style={{ fontSize:40, fontWeight:800, color: p.done===p.total && p.total>0 ? T.green : T.ink, lineHeight:1 }}>{p.done}/{p.total}</p>
+                  <p style={{ fontSize:13, color:T.dim, marginTop:4, marginBottom:12 }}>completed</p>
+                  {p.total > 0 && <Bar val={p.done} max={p.total} color={p.color} h={8} />}
+                  {p.roll > 0 && <p style={{ fontSize:13, color:T.amber, marginTop:8, fontWeight:600 }}>↩ {p.roll} item{p.roll>1?'s':''} to roll forward</p>}
+                </Card>
+              ))}
+            </div>
+
+            {['chad','joelle'].map(p => todos[p].length > 0 && (
+              <div key={p} style={{ marginBottom:20 }}>
+                <p style={{ fontSize:12, fontWeight:800, letterSpacing:1, textTransform:'uppercase', color:T.dim, marginBottom:10 }}>{p==='chad'?'👦 Chad':'👩 Joelle'} — mark what's done</p>
+                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  {todos[p].map(item => (
+                    <div key={item.id} onClick={()=>toggleTodoDone(p, item.id)} style={{
+                      display:'flex', alignItems:'center', gap:12, cursor:'pointer',
+                      background: item.done ? T.greenBg : T.card, border:`1px solid ${item.done ? T.greenMid : T.border}`,
+                      borderRadius:12, padding:'12px 16px', transition:'all .15s'
+                    }}>
+                      <div style={{ width:20, height:20, borderRadius:6, border:`2px solid ${item.done ? T.green : T.border}`, background: item.done ? T.green : 'transparent', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                        {item.done && <span style={{ color:'#fff', fontSize:11, fontWeight:800 }}>✓</span>}
+                      </div>
+                      <p style={{ flex:1, fontSize:14, color: item.done ? T.dim : T.ink, textDecoration: item.done ? 'line-through' : 'none' }}>{item.text}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            {(chadRoll > 0 || joelleRoll > 0) && (
+              <div onClick={()=>setRollForward(r=>!r)} style={{
+                display:'flex', alignItems:'center', gap:14, background: rollForward ? T.greenBg : T.card,
+                border:`1px solid ${rollForward ? T.greenMid : T.border}`, borderRadius:14, padding:'16px 20px', cursor:'pointer'
+              }}>
+                <div style={{ width:22, height:22, borderRadius:7, border:`2px solid ${rollForward ? T.green : T.border}`, background: rollForward ? T.green : 'transparent', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  {rollForward && <span style={{ color:'#fff', fontSize:12, fontWeight:800 }}>✓</span>}
+                </div>
+                <div>
+                  <p style={{ fontWeight:700, fontSize:14 }}>Roll {chadRoll+joelleRoll} unfinished item{(chadRoll+joelleRoll)>1?'s':''} into new session</p>
+                  <p style={{ fontSize:12, color:T.dim, marginTop:2 }}>They'll appear at the top of each person's list in the new session</p>
+                </div>
+              </div>
+            )}
+            {todos.chad.length === 0 && todos.joelle.length === 0 && (
+              <Card style={{ textAlign:'center', padding:'40px' }}>
+                <p style={{ fontSize:15, color:T.dim }}>No todos from a previous session found.</p>
+                <p style={{ fontSize:13, color:T.dim, marginTop:6 }}>Add items during the session using the ✅ bubble.</p>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {/* UPCOMING NOTES */}
+        {tab==='upcoming' && (
+          <div>
+            <p style={{ fontSize:22, fontWeight:800, marginBottom:6 }}>Upcoming Reminder Notes</p>
+            <p style={{ color:T.dim, fontSize:14, marginBottom:24 }}>Review and update the reminder notes that appear on the Upcoming Changes screen. Edit, clear, or carry them forward.</p>
+            <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:24 }}>
+              {upcomingNotes.map((n, i) => (
+                <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:12, background:T.card, border:`1px solid ${T.border}`, borderRadius:14, padding:'14px 18px' }}>
+                  <span style={{ fontSize:14, fontWeight:800, color:T.dim, marginTop:10, flexShrink:0 }}>{i+1}</span>
+                  <textarea value={n} onChange={e => { const next=[...upcomingNotes]; next[i]=e.target.value; setUpcomingNotes(next); }}
+                    placeholder="Reminder note..."
+                    rows={2} style={{ flex:1, border:'none', outline:'none', resize:'none', fontFamily:'inherit', fontSize:14, color:T.ink, background:'transparent', lineHeight:1.5, padding:'4px 0' }} />
+                  {n && <button onClick={()=>{ const next=[...upcomingNotes]; next[i]=''; setUpcomingNotes(next); }}
+                    style={{ background:'none', border:'none', cursor:'pointer', color:T.border, fontSize:18, padding:'0 2px', marginTop:6 }}>×</button>}
+                </div>
+              ))}
+            </div>
+            <div onClick={()=>setClearNotes(c=>!c)} style={{
+              display:'flex', alignItems:'center', gap:14, background: clearNotes ? T.coralBg : T.card,
+              border:`1px solid ${clearNotes ? T.coralMid : T.border}`, borderRadius:14, padding:'16px 20px', cursor:'pointer'
+            }}>
+              <div style={{ width:22, height:22, borderRadius:7, border:`2px solid ${clearNotes ? T.coral : T.border}`, background: clearNotes ? T.coral : 'transparent', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                {clearNotes && <span style={{ color:'#fff', fontSize:12, fontWeight:800 }}>✓</span>}
+              </div>
+              <div>
+                <p style={{ fontWeight:700, fontSize:14 }}>Clear all notes for new session</p>
+                <p style={{ fontSize:12, color:T.dim, marginTop:2 }}>Wipes the reminder board so you start fresh</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─── APP SHELL ────────────────────────────────────────────────────────────────
+const SCREENS = [
+  { id:'welcome',   label:'Home',            comp: null },
+  { id:'picture',   label:'Big Picture',     comp: BigPicture },
+  { id:'cashflow',  label:'Cash Flow',       comp: CashFlow },
+  { id:'spending',  label:'Spending',        comp: Spending },
+  { id:'debt',      label:'Debt',            comp: Debt },
+  { id:'goals',     label:'Goals',           comp: Goals },
+  { id:'decisions', label:'Big Decisions',   comp: BigDecisions },
+  { id:'upcoming',  label:'Upcoming Changes',comp: UpcomingChanges },
+  { id:'ourlist',   label:'Our Lists',       comp: OurListsScreen },
+];
+
+const App = () => {
+  const [idx, setIdx] = useState(() => {
+    try { return parseInt(localStorage.getItem('moneydate_screen') || '0', 10); } catch { return 0; }
+  });
+  const [prepMode, setPrepMode] = useState(false);
+  const go = (n) => { const c = Math.max(0, Math.min(SCREENS.length-1, n)); setIdx(c); localStorage.setItem('moneydate_screen', c); };
+  const S = SCREENS[idx];
+  const isHome = idx === 0;
+
+  if (prepMode) return <PrepMode onExit={() => setPrepMode(false)} />;
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', height:'100vh', background: T.cream, overflow:'hidden' }}>
+      {!isHome && (
+        <nav style={{ display:'flex', alignItems:'center', gap:4, padding:'10px 40px', borderBottom:`1px solid ${T.border}`, background:'#FFF', flexShrink:0, flexWrap:'wrap' }}>
+          <button onClick={()=>go(0)} style={{ background:'none', border:'none', cursor:'pointer', color: T.dim, fontSize:13, fontWeight:600, padding:'4px 10px', borderRadius:100, marginRight:4 }}>💚 Cadence</button>
+          <div style={{ width:1, height:16, background: T.border, marginRight:4 }} />
+          {SCREENS.slice(1).map((s,i) => (
+            <button key={s.id} onClick={()=>go(i+1)} style={{
+              background: idx===i+1 ? T.ink : 'transparent', color: idx===i+1 ? '#fff' : T.dim,
+              border:'none', borderRadius:100, padding:'5px 14px', fontSize:13,
+              fontWeight: idx===i+1 ? 700 : 400, cursor:'pointer', transition:'all .15s'
+            }}>{s.label}</button>
+          ))}
+          <span style={{ marginLeft:'auto', fontSize:12, color: T.dim, fontWeight:600 }}>{idx}/{SCREENS.length-1}</span>
+        </nav>
+      )}
+
+      <div style={{ flex:1, overflowY:'auto' }}>
+        {isHome ? <Welcome onStart={()=>go(1)} onPrep={()=>setPrepMode(true)} /> : S.comp ? <S.comp /> : null}
+      </div>
+
+      {!isHome && (
+        <footer style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 40px', borderTop:`1px solid ${T.border}`, background:'#FFF', flexShrink:0 }}>
+          <button onClick={()=>go(idx-1)} disabled={idx<=1} style={{
+            background:'none', border:`1px solid ${idx<=1 ? T.border : T.border}`, borderRadius:100,
+            padding:'9px 22px', fontSize:14, cursor: idx<=1?'default':'pointer',
+            color: idx<=1 ? T.border : T.ink, transition:'all .15s'
+          }}>← Back</button>
+
+          <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+            {SCREENS.slice(1).map((_,i) => (
+              <div key={i} onClick={()=>go(i+1)} style={{
+                width: i+1===idx ? 22 : 8, height:8, borderRadius:4,
+                background: i+1===idx ? T.ink : T.border,
+                cursor:'pointer', transition:'all .3s'
+              }} />
+            ))}
+          </div>
+
+          {idx < SCREENS.length-1
+            ? <button onClick={()=>go(idx+1)} style={{ background: T.ink, color:'#fff', border:'none', borderRadius:100, padding:'9px 26px', fontSize:14, fontWeight:700, cursor:'pointer' }}>Next →</button>
+            : <button onClick={()=>go(0)} style={{ background: T.green, color:'#fff', border:'none', borderRadius:100, padding:'9px 26px', fontSize:14, fontWeight:700, cursor:'pointer' }}>Start Over 🔄</button>
+          }
+        </footer>
+      )}
+    </div>
+  );
+};
+
+// ─── FLOATING PANEL ──────────────────────────────────────────────────────────
+const OurList = () => {
+  const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState('chad');
+  const [items, setItems] = useState(loadListItems);
+  const [priorities, setPriorities] = useState(loadPriorities);
+  const [notesList, setNotesList] = useState(loadNotesList);
+  const [noteInput, setNoteInput] = useState('');
+  const [input, setInput] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  // Re-sync from localStorage when panel opens (so Our Lists screen changes show up)
+  useEffect(() => {
+    if (open) {
+      setItems(loadListItems());
+      setPriorities(loadPriorities());
+      setNotesList(loadNotesList());
+    }
+  }, [open]);
+
+  const saveItems = (next) => { setItems(next); localStorage.setItem('moneydate_list', JSON.stringify(next)); };
+  const savePriorities = (next) => { setPriorities(next); localStorage.setItem('moneydate_priorities', JSON.stringify(next)); };
+  const saveNotesList = (next) => { setNotesList(next); localStorage.setItem('moneydate_notes_list', JSON.stringify(next)); };
+
+  const add = () => {
+    const text = input.trim(); if (!text) return;
+    saveItems({ ...items, [tab]: [...items[tab], { text, done: false, id: Date.now() }] });
+    setInput('');
+  };
+  const toggle = (person, id) => saveItems({ ...items, [person]: items[person].map(i => i.id === id ? { ...i, done: !i.done } : i) });
+  const remove = (person, id) => saveItems({ ...items, [person]: items[person].filter(i => i.id !== id) });
+  const updatePriority = (i, val) => { const n = [...priorities]; n[i] = val; savePriorities(n); };
+  const addNote = () => {
+    const text = noteInput.trim(); if (!text) return;
+    saveNotesList([...notesList, { text, id: Date.now() }]);
+    setNoteInput('');
+  };
+  const removeNote = (id) => saveNotesList(notesList.filter(n => n.id !== id));
+
+  const share = () => {
+    const date = new Date().toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
+    const lines = ['=== STEWART FAMILY MONEY DATE ===', date, ''];
+    lines.push('--- CHAD\'S TO-DOS ---');
+    if (items.chad.length) items.chad.forEach(i => lines.push((i.done ? '[x] ' : '[ ] ') + i.text));
+    else lines.push('(none)');
+    lines.push('');
+    lines.push('--- JOELLE\'S TO-DOS ---');
+    if (items.joelle.length) items.joelle.forEach(i => lines.push((i.done ? '[x] ' : '[ ] ') + i.text));
+    else lines.push('(none)');
+    lines.push('');
+    lines.push('--- PRIORITIES ---');
+    priorities.forEach((p, i) => { if (p.trim()) lines.push(`Goal #${i+1}: ${p}`); });
+    lines.push('');
+    if (notesList.length) {
+      lines.push('--- NOTES ---');
+      notesList.forEach((n, i) => lines.push(`${i+1}. ${n.text}`));
+    }
+    const text = lines.join('\n').trim();
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true); setTimeout(() => setCopied(false), 3000);
+    }).catch(() => { window.prompt('Copy and paste to save:', text); });
+  };
+
+  const totalCount = items.chad.length + items.joelle.length;
+  const doneCount = items.chad.filter(i=>i.done).length + items.joelle.filter(i=>i.done).length;
+
+  const TABS = [
+    { id:'chad', label:'👦 Chad' },
+    { id:'joelle', label:'👩 Joelle' },
+    { id:'goals', label:'📌 Goals' },
+  ];
+
+  return (
+    <>
+      <button onClick={() => setOpen(o => !o)} style={{
+        position:'fixed', bottom: 76, right: 24, width: 52, height: 52, borderRadius:'50%',
+        background: open ? T.ink : T.green, color:'#fff', border:'none', cursor:'pointer',
+        fontSize: 20, boxShadow:'0 4px 16px rgba(0,0,0,0.18)', zIndex: 1000,
+        display:'flex', alignItems:'center', justifyContent:'center', transition:'all .2s'
+      }}>
+        {open ? '✕' : '✅'}
+        {!open && totalCount > 0 && (
+          <span style={{ position:'absolute', top:-4, right:-4, background: T.coral, color:'#fff', borderRadius:'50%', width:18, height:18, fontSize:10, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center' }}>
+            {totalCount - doneCount > 0 ? totalCount - doneCount : '✓'}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div style={{
+          position:'fixed', bottom: 136, right: 24, width: 380, maxHeight: 560,
+          background:'#fff', borderRadius: 20, boxShadow:'0 8px 40px rgba(0,0,0,0.18)',
+          border:`1px solid ${T.border}`, zIndex: 999, display:'flex', flexDirection:'column', overflow:'hidden'
+        }}>
+          <div style={{ padding:'14px 18px 10px', borderBottom:`1px solid ${T.border}`, flexShrink:0 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+              <p style={{ fontWeight:800, fontSize:15 }}>💚 Cadence</p>
+              <span style={{ fontSize:12, color:T.dim }}>{doneCount}/{totalCount} done</span>
+            </div>
+            <div style={{ display:'flex', background:'#F4F1EC', borderRadius:10, padding:3, gap:2 }}>
+              {TABS.map(t => (
+                <button key={t.id} onClick={()=>setTab(t.id)} style={{
+                  flex:1, background: tab===t.id ? '#fff' : 'transparent',
+                  border:'none', borderRadius:8, padding:'5px 4px', fontSize:11.5, fontWeight:700,
+                  color: tab===t.id ? T.ink : T.dim, cursor:'pointer', transition:'all .15s',
+                  boxShadow: tab===t.id ? '0 1px 4px rgba(0,0,0,0.08)' : 'none', whiteSpace:'nowrap'
+                }}>{t.label}{(t.id==='chad'||t.id==='joelle') && items[t.id].length > 0 ? ` (${items[t.id].filter(i=>i.done).length}/${items[t.id].length})` : ''}</button>
+              ))}
+            </div>
+          </div>
+
+          {(tab === 'chad' || tab === 'joelle') && (
+            <>
+              <div style={{ flex:1, overflowY:'auto', padding:'10px 16px' }}>
+                {items[tab].length === 0 && <p style={{ fontSize:13, color:T.dim, textAlign:'center', padding:'20px 0' }}>No items yet — add one below</p>}
+                {items[tab].map(item => (
+                  <div key={item.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 4px', borderBottom:`1px solid ${T.border}` }}>
+                    <div onClick={()=>toggle(tab, item.id)} style={{ width:20, height:20, borderRadius:6, border:`2px solid ${item.done ? T.green : T.border}`, background: item.done ? T.green : 'transparent', flexShrink:0, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                      {item.done && <span style={{ color:'#fff', fontSize:11, fontWeight:800 }}>✓</span>}
+                    </div>
+                    <p style={{ flex:1, fontSize:13, color: item.done ? T.dim : T.ink, textDecoration: item.done ? 'line-through' : 'none', lineHeight:1.4 }}>{item.text}</p>
+                    <button onClick={()=>remove(tab, item.id)} style={{ background:'none', border:'none', cursor:'pointer', color:T.border, fontSize:16, padding:'0 2px', lineHeight:1 }}>×</button>
+                  </div>
+                ))}
+              </div>
+              <div style={{ padding:'10px 14px', borderTop:`1px solid ${T.border}`, display:'flex', gap:8, flexShrink:0 }}>
+                <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&add()}
+                  placeholder={`Add ${tab==='chad'?'Chad':'Joelle'}'s item...`}
+                  style={{ flex:1, border:`1px solid ${T.border}`, borderRadius:10, padding:'8px 12px', fontSize:13, outline:'none', fontFamily:'inherit' }} />
+                <button onClick={add} style={{ background:T.green, color:'#fff', border:'none', borderRadius:10, padding:'8px 14px', fontSize:13, fontWeight:700, cursor:'pointer' }}>+</button>
+              </div>
+            </>
+          )}
+
+          {tab === 'goals' && (
+            <div style={{ flex:1, overflowY:'auto', padding:'14px 16px' }}>
+              <p style={{ fontSize:11, fontWeight:800, letterSpacing:1, textTransform:'uppercase', color:T.dim, marginBottom:10 }}>Our 3 Priorities</p>
+              <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:18 }}>
+                {priorities.map((p, i) => (
+                  <div key={i} style={{ display:'flex', alignItems:'center', gap:10, background:T.greenBg, border:`1px solid ${T.greenMid}`, borderRadius:12, padding:'10px 14px' }}>
+                    <span style={{ fontSize:13, fontWeight:800, color:T.green, flexShrink:0 }}>#{i+1}</span>
+                    <input value={p} onChange={e=>updatePriority(i, e.target.value)} placeholder={`Priority #${i+1}...`}
+                      style={{ flex:1, border:'none', outline:'none', background:'transparent', fontFamily:'inherit', fontSize:13, color:T.ink }} />
+                  </div>
+                ))}
+              </div>
+              <p style={{ fontSize:11, fontWeight:800, letterSpacing:1, textTransform:'uppercase', color:T.dim, marginBottom:8 }}>Notes</p>
+              {notesList.map((n, i) => (
+                <div key={n.id} style={{ display:'flex', alignItems:'flex-start', gap:8, padding:'8px 4px', borderBottom:`1px solid ${T.border}` }}>
+                  <span style={{ fontSize:12, color:T.dim, marginTop:2, flexShrink:0 }}>{i+1}.</span>
+                  <p style={{ flex:1, fontSize:13, color:T.ink, lineHeight:1.4 }}>{n.text}</p>
+                  <button onClick={()=>removeNote(n.id)} style={{ background:'none', border:'none', cursor:'pointer', color:T.border, fontSize:16, padding:'0 2px', lineHeight:1 }}>×</button>
+                </div>
+              ))}
+              <div style={{ display:'flex', gap:8, marginTop:10 }}>
+                <input value={noteInput} onChange={e=>setNoteInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addNote()}
+                  placeholder="Add a note..."
+                  style={{ flex:1, border:`1px solid ${T.border}`, borderRadius:10, padding:'8px 12px', fontSize:13, outline:'none', fontFamily:'inherit' }} />
+                <button onClick={addNote} style={{ background:T.amber, color:'#fff', border:'none', borderRadius:10, padding:'8px 14px', fontSize:13, fontWeight:700, cursor:'pointer' }}>+</button>
+              </div>
+            </div>
+          )}
+
+          <div style={{ padding:'10px 14px 14px', borderTop:`1px solid ${T.border}`, flexShrink:0 }}>
+            <button onClick={share} style={{
+              width:'100%', background: copied ? T.greenBg : T.ink, color: copied ? T.green : '#fff',
+              border:`1px solid ${copied ? T.greenMid : T.ink}`, borderRadius:12, padding:'10px',
+              fontSize:13, fontWeight:700, cursor:'pointer', transition:'all .2s'
+            }}>{copied ? '✓ Copied!' : '📋 Export session'}</button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
+
+// Inject OurList into App
+const AppWithList = () => (
+  <>
+    <App />
+    <OurList />
+  </>
+);
+
+ReactDOM.createRoot(document.getElementById('root')).render(<AppWithList />);
+</script>
+</body>
+</html>
