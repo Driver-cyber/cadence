@@ -14,7 +14,7 @@
 
 **Ask before assuming:** If a request contradicts something in DECISIONS.md, surface it. "Are we pivoting?" is always the right question.
 
-**Token discipline:** Do not read files speculatively. Ask for the specific file if unsure. The app is ~1,970 lines — don't load it unless the task requires it.
+**Token discipline:** Do not read files speculatively. Ask for the specific file if unsure. The app is ~2,000 lines — don't load it unless the task requires it.
 
 ---
 
@@ -92,8 +92,15 @@
 - Last Session tab: mark todos done, roll incomplete forward
 - Save & Apply writes to storage and reloads with fresh data
 
+### URL / Hash Routing
+- Every screen is directly linkable via hash: `/#welcome`, `/#cashflow`, `/#ourlist`, etc.
+- `/#lists` is a friendly alias for `/#ourlist` — the canonical shareable bookmark for Joelle
+- `go(n)` updates `window.location.hash`; `hashchange` listener keeps browser back/forward working
+- On load: hash takes priority over localStorage for initial screen
+
 ### Import Flow
 - Paste previous session export text on Welcome screen
+- Accepts two formats: (1) app's own export format, (2) plain `--- Chad ---` / `[ ] text` format
 - Parses todo completion status
 - Shows per-person recap with progress bars
 - Option to roll incomplete items forward
