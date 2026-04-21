@@ -8,11 +8,11 @@
 
 ## 🎯 Current State
 
-**App status:** Feature-complete v1. Phase 1 (Supabase migration) complete and live on `main`.
+**App status:** Feature-complete v1. Phase 1 (Supabase migration) complete and live on `main`. Hash routing live — `/#lists` is Joelle's bookmark. April 20 session imported and rolled forward.
 
 **Current phase:** Phase 2 planning — real-time subscriptions so Chad and Joelle see each other's changes live without refresh.
 
-**Immediate next task:** Decide Phase 2 scope and approach (see Parking Lot). Red-team Phase 1 before committing to Phase 2.
+**Immediate next task:** Red-team Phase 1 (5 known issues below), then decide Phase 2 scope.
 
 ---
 
@@ -37,6 +37,8 @@
 | 2026-04-21 | Phase 1 complete: all `moneydate_*` localStorage keys → Supabase | Session-scoped: todos, priorities, notes. Family-scoped: upcoming_notes, budget_data. `moneydate_screen` stays in localStorage (nav state only). |
 | 2026-04-21 | Session definition: open until Prep Mode Save & Apply closes it | Prep Mode is the session boundary. One open session at a time. On load: reuse open session or auto-create one. |
 | 2026-04-21 | Supabase anon key committed to source | Anon key is public by design; RLS `family_id = 'stewarts'` protects data. Acceptable for a private family app. |
+| 2026-04-21 | Hash-based routing for direct screen links | `/#lists` (alias for `/#ourlist`) is Joelle's bookmark. Every screen linkable by id. No server config needed — pure client-side. `go()` updates hash; `hashchange` listener keeps back/forward working. |
+| 2026-04-21 | Import flow accepts plain `--- Chad ---` / `[ ]` format | Parser handles both app export format and manual plain-text lists. Confirmed working with April 20 session RTF content. |
 
 ---
 
@@ -87,6 +89,8 @@
 ---
 
 ## 📝 Change Log
+
+**[2026-04-21]** — Hash routing added. Every screen directly linkable via `/#screen-id`. `/#lists` is Joelle's bookmark for Our Lists. Import flow confirmed accepting plain `--- Chad ---` / `[ ]` text format — April 20 session successfully rolled forward.
 
 **[2026-04-21]** — Phase 1 complete. localStorage → Supabase migration shipped and merged to main. `db` module added with full CRUD for all five data types. `currentSessionId` tracks open session. Session persists until Prep Mode Save & Apply. Cross-device data persistence now live.
 
