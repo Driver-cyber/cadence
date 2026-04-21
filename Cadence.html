@@ -8,6 +8,7 @@
   <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body, #root { height: 100%; font-family: 'Outfit', sans-serif; background: #FAF7F2; color: #1C1C1E; }
@@ -196,27 +197,151 @@ const DEFAULT_D = {
   ],
 };
 
-// Live data — merges DEFAULT_D with any edits saved during Prep Mode
-const D = (() => {
-  try {
-    const saved = JSON.parse(localStorage.getItem('moneydate_data') || 'null');
-    if (!saved) return DEFAULT_D;
-    return {
-      ...DEFAULT_D,
-      ...saved,
-      date: DEFAULT_D.date,
-      accounts: { ...DEFAULT_D.accounts, ...(saved.accounts || {}) },
-      income: {
-        total: saved.income?.total ?? DEFAULT_D.income.total,
-        sources: saved.income?.sources ?? DEFAULT_D.income.sources,
+// ─── SUPABASE ─────────────────────────────────────────────────────────────────
+const SUPABASE_URL     = 'https://pwxtcdutncsbnffvaszh.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable__l5FPA2OKH-sPI0TP0E4Xg_HxpGr9ni';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const FAMILY_ID = 'stewarts';
+let currentSessionId = null;
+
+// Live data — starts as DEFAULT_D, updated after Supabase load completes
+let D = DEFAULT_D;
+
+// Populated by db.init() before first render; components read from here
+const INIT = { todos: { chad: [], joelle: [] }, priorities: ['','',''], notes: [], upcomingNotes: ['','','','',''] };
+
+const mergeD = (saved) => {
+  if (!saved || !Object.keys(saved).length) return DEFAULT_D;
+  return {
+    ...DEFAULT_D, ...saved,
+    date: DEFAULT_D.date,
+    accounts:     { ...DEFAULT_D.accounts, ...(saved.accounts || {}) },
+    income:       { total: saved.income?.total ?? DEFAULT_D.income.total, sources: saved.income?.sources ?? DEFAULT_D.income.sources },
+    spending:     saved.spending     ?? DEFAULT_D.spending,
+    fixedBills:   saved.fixedBills   ?? DEFAULT_D.fixedBills,
+    variableSpend: saved.variableSpend ?? DEFAULT_D.variableSpend,
+    deficit:      saved.deficit      ?? DEFAULT_D.deficit,
+  };
+};
+
+const db = {
+  async init() {
+    // Find open session or create one
+    const { data: sessions } = await sb.from('sessions')
+      .select().eq('family_id', FAMILY_ID).is('completed_at', null)
+      .order('created_at', { ascending: false }).limit(1);
+    let session = sessions?.[0];
+    if (!session) {
+      const { data } = await sb.from('sessions')
+        .insert({ family_id: FAMILY_ID, session_date: new Date().toISOString().split('T')[0] })
+        .select().single();
+      session = data;
+    }
+    currentSessionId = session.id;
+
+    const [budgetRes, todosRes, priRes, notesRes, upcomingRes] = await Promise.all([
+      sb.from('budget_data').select('data').eq('family_id', FAMILY_ID).single(),
+      sb.from('todos').select('*').eq('session_id', currentSessionId).order('sort_order'),
+      sb.from('priorities').select('*').eq('session_id', currentSessionId).order('slot'),
+      sb.from('notes').select('*').eq('session_id', currentSessionId).order('sort_order'),
+      sb.from('upcoming_notes').select('*').eq('family_id', FAMILY_ID).order('slot'),
+    ]);
+
+    D = mergeD(budgetRes.data?.data);
+
+    const allTodos = todosRes.data || [];
+    const pris     = priRes.data   || [];
+    const uNotes   = upcomingRes.data || [];
+
+    Object.assign(INIT, {
+      todos: {
+        chad:   allTodos.filter(t => t.person === 'chad').map(t => ({ id: t.id, text: t.text, done: t.done })),
+        joelle: allTodos.filter(t => t.person === 'joelle').map(t => ({ id: t.id, text: t.text, done: t.done })),
       },
-      spending: saved.spending ?? DEFAULT_D.spending,
-      fixedBills: saved.fixedBills ?? DEFAULT_D.fixedBills,
-      variableSpend: saved.variableSpend ?? DEFAULT_D.variableSpend,
-      deficit: saved.deficit ?? DEFAULT_D.deficit,
+      priorities:    [0,1,2].map(i => pris.find(p => p.slot === i+1)?.text ?? ''),
+      notes:         (notesRes.data || []).map(n => ({ id: n.id, text: n.text })),
+      upcomingNotes: [1,2,3,4,5].map(i => uNotes.find(u => u.slot === i)?.text ?? ''),
+    });
+  },
+
+  async addTodo(person, text, sortOrder) {
+    const { data } = await sb.from('todos').insert({
+      family_id: FAMILY_ID, session_id: currentSessionId,
+      person, text, done: false, sort_order: sortOrder,
+    }).select().single();
+    return data;
+  },
+  toggleTodo(id, done) {
+    sb.from('todos').update({ done, updated_at: new Date().toISOString() }).eq('id', id);
+  },
+  deleteTodo(id) {
+    sb.from('todos').delete().eq('id', id);
+  },
+
+  savePriority(slot, text) {
+    sb.from('priorities').upsert(
+      { family_id: FAMILY_ID, session_id: currentSessionId, slot, text, updated_at: new Date().toISOString() },
+      { onConflict: 'session_id,slot' }
+    );
+  },
+
+  async addNote(text, sortOrder) {
+    const { data } = await sb.from('notes').insert({
+      family_id: FAMILY_ID, session_id: currentSessionId, text, sort_order: sortOrder,
+    }).select().single();
+    return data;
+  },
+  deleteNote(id) {
+    sb.from('notes').delete().eq('id', id);
+  },
+
+  saveUpcomingNote(slot, text) {
+    sb.from('upcoming_notes').upsert(
+      { family_id: FAMILY_ID, slot, text, updated_at: new Date().toISOString() },
+      { onConflict: 'family_id,slot' }
+    );
+  },
+
+  async saveBudgetData(data) {
+    await sb.from('budget_data').upsert(
+      { family_id: FAMILY_ID, data, updated_at: new Date().toISOString(), updated_by: 'chad' },
+      { onConflict: 'family_id' }
+    );
+  },
+
+  async newSession(rolledTodos) {
+    await sb.from('sessions').update({ completed_at: new Date().toISOString() }).eq('id', currentSessionId);
+    const { data } = await sb.from('sessions')
+      .insert({ family_id: FAMILY_ID, session_date: new Date().toISOString().split('T')[0] })
+      .select().single();
+    currentSessionId = data.id;
+    if (rolledTodos.length) {
+      await sb.from('todos').insert(
+        rolledTodos.map((item, i) => ({
+          family_id: FAMILY_ID, session_id: currentSessionId,
+          person: item.person, text: item.text, done: false, sort_order: i,
+        }))
+      );
+    }
+  },
+
+  async loadTodos() {
+    const { data } = await sb.from('todos').select('*').eq('session_id', currentSessionId).order('sort_order');
+    const rows = data || [];
+    return {
+      chad:   rows.filter(t => t.person === 'chad').map(t => ({ id: t.id, text: t.text, done: t.done })),
+      joelle: rows.filter(t => t.person === 'joelle').map(t => ({ id: t.id, text: t.text, done: t.done })),
     };
-  } catch { return DEFAULT_D; }
-})();
+  },
+  async loadPriorities() {
+    const { data } = await sb.from('priorities').select('*').eq('session_id', currentSessionId).order('slot');
+    return [0,1,2].map(i => data?.find(p => p.slot === i+1)?.text ?? '');
+  },
+  async loadNotes() {
+    const { data } = await sb.from('notes').select('*').eq('session_id', currentSessionId).order('sort_order');
+    return (data || []).map(n => ({ id: n.id, text: n.text }));
+  },
+};
 
 // ─── TOKENS ───────────────────────────────────────────────────────────────────
 const T = {
@@ -322,15 +447,22 @@ const Welcome = ({ onStart, onPrep }) => {
     setMode('recap');
   };
 
-  const handleStartWithImport = () => {
+  const handleStartWithImport = async () => {
     if (rollForward && parsed) {
-      const rollChad = parsed.chad.filter(i => !i.done).map(i => ({ ...i, id: Date.now() + Math.random() }));
-      const rollJoelle = parsed.joelle.filter(i => !i.done).map(i => ({ ...i, id: Date.now() + Math.random() }));
-      const existing = (() => { try { return JSON.parse(localStorage.getItem('moneydate_list') || '{"chad":[],"joelle":[]}'); } catch { return { chad:[], joelle:[] }; }})();
-      localStorage.setItem('moneydate_list', JSON.stringify({
-        chad: [...rollChad, ...existing.chad],
-        joelle: [...rollJoelle, ...existing.joelle],
-      }));
+      const rollChad   = parsed.chad.filter(i => !i.done);
+      const rollJoelle = parsed.joelle.filter(i => !i.done);
+      const chadOffset   = INIT.todos.chad.length;
+      const joelleOffset = INIT.todos.joelle.length;
+      await Promise.all([
+        ...rollChad.map((item, i) =>
+          db.addTodo('chad', item.text, chadOffset + i)
+            .then(data => INIT.todos.chad.push({ id: data.id, text: item.text, done: false }))
+        ),
+        ...rollJoelle.map((item, i) =>
+          db.addTodo('joelle', item.text, joelleOffset + i)
+            .then(data => INIT.todos.joelle.push({ id: data.id, text: item.text, done: false }))
+        ),
+      ]);
     }
     onStart();
   };
@@ -914,16 +1046,11 @@ const SMART_BULLETINS = [
 ];
 
 const UpcomingChanges = () => {
-  const [notes, setNotes] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('moneydate_upcoming_notes') || '["","","","",""]'); }
-    catch { return ['','','','','']; }
-  });
+  const [notes, setNotes] = useState(INIT.upcomingNotes);
 
   const updateNote = (i, val) => {
-    const next = [...notes];
-    next[i] = val;
-    setNotes(next);
-    localStorage.setItem('moneydate_upcoming_notes', JSON.stringify(next));
+    const next = [...notes]; next[i] = val; setNotes(next);
+    db.saveUpcomingNote(i + 1, val);
   };
 
   return (
@@ -985,31 +1112,46 @@ const useIsMobile = () => {
   return mobile;
 };
 
-// ─── SHARED LIST STATE HELPERS ────────────────────────────────────────────────
-const loadListItems = () => { try { return JSON.parse(localStorage.getItem('moneydate_list') || '{"chad":[],"joelle":[]}'); } catch { return { chad:[], joelle:[] }; } };
-const loadPriorities = () => { try { return JSON.parse(localStorage.getItem('moneydate_priorities') || '["","",""]'); } catch { return ['','','']; } };
-const loadNotesList = () => { try { return JSON.parse(localStorage.getItem('moneydate_notes_list') || '[]'); } catch { return []; } };
-
 // ─── OUR LISTS SCREEN (mobile-first, replaces familylists app) ───────────────
 const OurListsScreen = () => {
   const mobile = useIsMobile();
   const [tab, setTab] = useState('chad');
-  const [items, setItems] = useState(loadListItems);
-  const [priorities, setPriorities] = useState(loadPriorities);
-  const [notesList, setNotesList] = useState(loadNotesList);
+  const [items, setItems] = useState(INIT.todos);
+  const [priorities, setPriorities] = useState(INIT.priorities);
+  const [notesList, setNotesList] = useState(INIT.notes);
   const [input, setInput] = useState('');
   const [noteInput, setNoteInput] = useState('');
 
-  const saveItems = (next) => { setItems(next); localStorage.setItem('moneydate_list', JSON.stringify(next)); };
-  const savePriorities = (next) => { setPriorities(next); localStorage.setItem('moneydate_priorities', JSON.stringify(next)); };
-  const saveNotes = (next) => { setNotesList(next); localStorage.setItem('moneydate_notes_list', JSON.stringify(next)); };
-
-  const add = () => { const t = input.trim(); if (!t || (tab !== 'chad' && tab !== 'joelle')) return; saveItems({ ...items, [tab]: [...items[tab], { text:t, done:false, id:Date.now() }] }); setInput(''); };
-  const toggle = (p, id) => saveItems({ ...items, [p]: items[p].map(i => i.id===id ? {...i, done:!i.done} : i) });
-  const remove = (p, id) => saveItems({ ...items, [p]: items[p].filter(i => i.id!==id) });
-  const updatePriority = (i, val) => { const n=[...priorities]; n[i]=val; savePriorities(n); };
-  const addNote = () => { const t=noteInput.trim(); if(!t) return; saveNotes([...notesList, {text:t, id:Date.now()}]); setNoteInput(''); };
-  const removeNote = (id) => saveNotes(notesList.filter(n=>n.id!==id));
+  const add = async () => {
+    const t = input.trim();
+    if (!t || (tab !== 'chad' && tab !== 'joelle')) return;
+    const data = await db.addTodo(tab, t, items[tab].length);
+    setItems(prev => ({ ...prev, [tab]: [...prev[tab], { id: data.id, text: t, done: false }] }));
+    setInput('');
+  };
+  const toggle = (p, id) => {
+    const done = !items[p].find(i => i.id === id).done;
+    setItems(prev => ({ ...prev, [p]: prev[p].map(i => i.id === id ? { ...i, done } : i) }));
+    db.toggleTodo(id, done);
+  };
+  const remove = (p, id) => {
+    setItems(prev => ({ ...prev, [p]: prev[p].filter(i => i.id !== id) }));
+    db.deleteTodo(id);
+  };
+  const updatePriority = (i, val) => {
+    const n = [...priorities]; n[i] = val; setPriorities(n);
+    db.savePriority(i + 1, val);
+  };
+  const addNote = async () => {
+    const t = noteInput.trim(); if (!t) return;
+    const data = await db.addNote(t, notesList.length);
+    setNotesList(prev => [...prev, { id: data.id, text: t }]);
+    setNoteInput('');
+  };
+  const removeNote = (id) => {
+    setNotesList(prev => prev.filter(n => n.id !== id));
+    db.deleteNote(id);
+  };
 
   const allTotal = items.chad.length + items.joelle.length;
   const allDone = items.chad.filter(i=>i.done).length + items.joelle.filter(i=>i.done).length;
@@ -1264,14 +1406,8 @@ const PrepMode = ({ onExit }) => {
   const [sources, setSources] = useState(D.income.sources.map((s,i) => ({ ...s, _id: i })));
   const [fixedBills, setFixedBills] = useState(D.fixedBills);
   const [spending, setSpending] = useState(D.spending.map((s,i) => ({ ...s, _id: i })));
-  const [upcomingNotes, setUpcomingNotes] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('moneydate_upcoming_notes') || '["","","","",""]'); }
-    catch { return ['','','','','']; }
-  });
-  const [todos, setTodos] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('moneydate_list') || '{"chad":[],"joelle":[]}'); }
-    catch { return { chad:[], joelle:[] }; }
-  });
+  const [upcomingNotes, setUpcomingNotes] = useState(INIT.upcomingNotes);
+  const [todos, setTodos] = useState(INIT.todos);
   const [rollForward, setRollForward] = useState(true);
   const [clearNotes, setClearNotes] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -1287,7 +1423,7 @@ const PrepMode = ({ onExit }) => {
   const updateSpend = (id, k, v) => setSpending(s => s.map(x => x._id===id ? { ...x, [k]: k==='mo' ? (parseFloat(v)||0) : v } : x));
   const toggleTodoDone = (p, id) => setTodos(t => ({ ...t, [p]: t[p].map(i => i.id===id ? { ...i, done:!i.done } : i) }));
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const totalLiquid = Object.entries(acct)
       .filter(([k]) => ['billing','groceries','propertyTax','emergency','ordoWATB','baselane'].includes(k))
       .reduce((s,[,v]) => s + v, 0);
@@ -1302,15 +1438,21 @@ const PrepMode = ({ onExit }) => {
       deficit,
       spending: spending.map(({ _id, ...rest }) => rest),
     };
-    localStorage.setItem('moneydate_data', JSON.stringify(newData));
-    localStorage.setItem('moneydate_upcoming_notes', JSON.stringify(clearNotes ? ['','','','',''] : upcomingNotes));
 
-    if (rollForward) {
-      const mkRoll = arr => arr.filter(i=>!i.done).map(i=>({ ...i, id: Date.now()+Math.random() }));
-      localStorage.setItem('moneydate_list', JSON.stringify({ chad: mkRoll(todos.chad), joelle: mkRoll(todos.joelle) }));
-    } else {
-      localStorage.setItem('moneydate_list', JSON.stringify({ chad:[], joelle:[] }));
-    }
+    const notesToSave = clearNotes ? ['','','','',''] : upcomingNotes;
+    const rolledTodos = rollForward
+      ? [
+          ...todos.chad.filter(i => !i.done).map(i => ({ person: 'chad', text: i.text })),
+          ...todos.joelle.filter(i => !i.done).map(i => ({ person: 'joelle', text: i.text })),
+        ]
+      : [];
+
+    await Promise.all([
+      db.saveBudgetData(newData),
+      ...notesToSave.map((text, i) => db.saveUpcomingNote(i + 1, text)),
+    ]);
+    await db.newSession(rolledTodos);
+
     setSaved(true);
     setTimeout(() => window.location.reload(), 900);
   };
@@ -1644,13 +1786,29 @@ const SCREENS = [
 ];
 
 const App = () => {
+  const [ready, setReady] = useState(false);
   const [idx, setIdx] = useState(() => {
     try { return parseInt(localStorage.getItem('moneydate_screen') || '0', 10); } catch { return 0; }
   });
   const [prepMode, setPrepMode] = useState(false);
+
+  useEffect(() => {
+    db.init()
+      .then(() => setReady(true))
+      .catch(err => { console.error('Supabase init failed:', err); setReady(true); });
+  }, []);
+
   const go = (n) => { const c = Math.max(0, Math.min(SCREENS.length-1, n)); setIdx(c); localStorage.setItem('moneydate_screen', c); };
   const S = SCREENS[idx];
   const isHome = idx === 0;
+
+  if (!ready) return (
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100vh', background:'#FAF7F2', gap:16 }}>
+      <p style={{ fontSize:36 }}>💚</p>
+      <p style={{ fontFamily:"'Playfair Display', serif", fontSize:22, fontWeight:700, color:'#1C1C1E' }}>Cadence</p>
+      <p style={{ fontSize:14, color:'#6B6B70' }}>Loading your money date…</p>
+    </div>
+  );
 
   if (prepMode) return <PrepMode onExit={() => setPrepMode(false)} />;
 
@@ -1707,40 +1865,51 @@ const App = () => {
 const OurList = () => {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState('chad');
-  const [items, setItems] = useState(loadListItems);
-  const [priorities, setPriorities] = useState(loadPriorities);
-  const [notesList, setNotesList] = useState(loadNotesList);
+  const [items, setItems] = useState(INIT.todos);
+  const [priorities, setPriorities] = useState(INIT.priorities);
+  const [notesList, setNotesList] = useState(INIT.notes);
   const [noteInput, setNoteInput] = useState('');
   const [input, setInput] = useState('');
   const [copied, setCopied] = useState(false);
 
-  // Re-sync from localStorage when panel opens (so Our Lists screen changes show up)
+  // Re-sync from Supabase when panel opens so changes from OurLists show up
   useEffect(() => {
     if (open) {
-      setItems(loadListItems());
-      setPriorities(loadPriorities());
-      setNotesList(loadNotesList());
+      Promise.all([db.loadTodos(), db.loadPriorities(), db.loadNotes()]).then(([t, p, n]) => {
+        setItems(t); setPriorities(p); setNotesList(n);
+      });
     }
   }, [open]);
 
-  const saveItems = (next) => { setItems(next); localStorage.setItem('moneydate_list', JSON.stringify(next)); };
-  const savePriorities = (next) => { setPriorities(next); localStorage.setItem('moneydate_priorities', JSON.stringify(next)); };
-  const saveNotesList = (next) => { setNotesList(next); localStorage.setItem('moneydate_notes_list', JSON.stringify(next)); };
-
-  const add = () => {
+  const add = async () => {
     const text = input.trim(); if (!text) return;
-    saveItems({ ...items, [tab]: [...items[tab], { text, done: false, id: Date.now() }] });
+    const data = await db.addTodo(tab, text, items[tab].length);
+    setItems(prev => ({ ...prev, [tab]: [...prev[tab], { id: data.id, text, done: false }] }));
     setInput('');
   };
-  const toggle = (person, id) => saveItems({ ...items, [person]: items[person].map(i => i.id === id ? { ...i, done: !i.done } : i) });
-  const remove = (person, id) => saveItems({ ...items, [person]: items[person].filter(i => i.id !== id) });
-  const updatePriority = (i, val) => { const n = [...priorities]; n[i] = val; savePriorities(n); };
-  const addNote = () => {
+  const toggle = (person, id) => {
+    const done = !items[person].find(i => i.id === id).done;
+    setItems(prev => ({ ...prev, [person]: prev[person].map(i => i.id === id ? { ...i, done } : i) }));
+    db.toggleTodo(id, done);
+  };
+  const remove = (person, id) => {
+    setItems(prev => ({ ...prev, [person]: prev[person].filter(i => i.id !== id) }));
+    db.deleteTodo(id);
+  };
+  const updatePriority = (i, val) => {
+    const n = [...priorities]; n[i] = val; setPriorities(n);
+    db.savePriority(i + 1, val);
+  };
+  const addNote = async () => {
     const text = noteInput.trim(); if (!text) return;
-    saveNotesList([...notesList, { text, id: Date.now() }]);
+    const data = await db.addNote(text, notesList.length);
+    setNotesList(prev => [...prev, { id: data.id, text }]);
     setNoteInput('');
   };
-  const removeNote = (id) => saveNotesList(notesList.filter(n => n.id !== id));
+  const removeNote = (id) => {
+    setNotesList(prev => prev.filter(n => n.id !== id));
+    db.deleteNote(id);
+  };
 
   const share = () => {
     const date = new Date().toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
