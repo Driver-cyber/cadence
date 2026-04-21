@@ -14,7 +14,7 @@
 
 **Ask before assuming:** If a request contradicts something in DECISIONS.md, surface it. "Are we pivoting?" is always the right question.
 
-**Token discipline:** Do not read files speculatively. Ask for the specific file if unsure. The app is ~1,900 lines — don't load it unless the task requires it.
+**Token discipline:** Do not read files speculatively. Ask for the specific file if unsure. The app is ~1,970 lines — don't load it unless the task requires it.
 
 ---
 
@@ -26,7 +26,7 @@
 
 **The design ethos:** *Ordo ab chao* — taking messy real-world finances and making them feel manageable, even enjoyable. Warm but honest. We language ("we're in surplus"). Anti-anxiety. Designed for two.
 
-**Success in v1 (current):** Chad and Joelle can run a Money Date session on any device, check off todos, review their financial picture, and pick up where they left off next time.
+**Success in v1 (shipped):** Chad and Joelle can run a Money Date session on any device, check off todos, review their financial picture, and pick up where they left off next time. Data persists in Supabase — cross-device sync works on reload.
 
 **Success in v2 (next):** Real-time sync via Supabase so both see changes live across devices without refresh.
 
@@ -38,8 +38,8 @@
 |---|---|---|
 | **Frontend** | React 18 + Babel CDN | No build step. Component model without npm. Ships as a single HTML file. |
 | **Styling** | CSS-in-JS / inline styles within React | Collocated with components, no stylesheet to maintain. |
-| **State** | `localStorage` (current) → Supabase (next) | Shipped fast on localStorage. Migration to Supabase adds cross-device sync. |
-| **Database** | Supabase (PostgreSQL) | Schema already written (`SUPABASE_SCHEMA.sql`). Phase 1: replace localStorage calls. |
+| **State** | Supabase (Phase 1 complete) | All session data (todos, priorities, notes, upcoming_notes, budget_data) in Supabase. `moneydate_screen` stays in localStorage (nav only). |
+| **Database** | Supabase (PostgreSQL) | Schema live (`SUPABASE_SCHEMA.sql` applied). `db` module in `Cadence.html` wraps all calls. Phase 2: real-time subscriptions. |
 | **Hosting** | Cloudflare Pages | Auto-deploys on GitHub push. Zero config. |
 | **Version control** | GitHub | Repo: `Driver-cyber/cadence` (or similar) |
 | **Build process** | None (current) | Static HTML. A minimal build step may be added for Supabase env injection. |
@@ -103,26 +103,37 @@
 ## 🗃 Data Architecture
 
 ### Budget Data Pattern
-`DEFAULT_D` is baked into the source — it contains the full financial picture as of the last Prep Mode save. Prep Mode writes a partial override to storage (`moneydate_data`). On load, `DEFAULT_D` is merged with stored overrides to produce the live `D` object.
+`DEFAULT_D` is baked into the source — it contains the full financial picture as of the last Prep Mode save. Prep Mode writes an override to Supabase (`budget_data` table). On load, `db.init()` fetches this and calls `mergeD()` to produce the live `D` object. Components read from `D` directly (module-level mutable, safe because App gates render until `ready`).
 
 ### Item Schema (todos)
 ```js
-{ text: String, done: Boolean, id: Number /* Date.now() */ }
+{ text: String, done: Boolean, id: String /* Supabase UUID */ }
 ```
 
-### Current localStorage Keys
+### Storage Split
 ```
-moneydate_screen          → current screen index (integer)
-moneydate_data            → overrides for D object (JSON)
-moneydate_list            → { chad: TodoItem[], joelle: TodoItem[] }
-moneydate_priorities      → string[3] — shared monthly priorities
-moneydate_notes_list      → NoteItem[] — session notes
-moneydate_upcoming_notes  → string[5] — reminder board notes
+localStorage:
+  moneydate_screen       → current screen index (nav state only)
+
+Supabase (session-scoped):
+  todos                  → { person, text, done, sort_order, session_id }
+  priorities             → { slot 1-3, text, session_id }
+  notes                  → { text, sort_order, session_id }
+
+Supabase (family-scoped, persists across sessions):
+  upcoming_notes         → { slot 1-5, text, family_id }
+  budget_data            → { data (JSONB override of DEFAULT_D), family_id }
+  sessions               → { session_date, completed_at, family_id }
 ```
 
-### Supabase Target Tables
+### Session Lifecycle
+- App load → `db.init()` finds open session (`completed_at IS NULL`) or creates one
+- Session persists across all page loads and devices until Prep Mode Save & Apply
+- Prep Mode Save & Apply: closes session (`completed_at = now()`), creates new session, optionally inserts rolled-forward todos
+
+### Supabase Tables
 `sessions`, `todos`, `priorities`, `notes`, `upcoming_notes`, `budget_data`
-Full schema in `SUPABASE_SCHEMA.sql`. RLS is permissive (anon key, family_id scoped). Real-time enabled on todos, priorities, notes, upcoming_notes.
+Full schema in `SUPABASE_SCHEMA.sql`. RLS: anon key, `family_id = 'stewarts'`. Real-time publication enabled on todos, priorities, notes, upcoming_notes (Phase 2).
 
 ---
 
@@ -142,8 +153,8 @@ Full schema in `SUPABASE_SCHEMA.sql`. RLS is permissive (anon key, family_id sco
 | Floating Bubble | ✅ | Persistent, synced, export |
 | Prep Mode | ✅ | 5-tab data editor, save & apply |
 | Import Flow | ✅ | Paste export, recap, roll forward |
-| Supabase client setup | 🔜 | Replace localStorage — Phase 1 |
-| Real-time todo sync | 🔜 | Subscribe to todos table — Phase 2 |
+| Supabase client setup | ✅ | Phase 1 complete — all data in Supabase, `db` module live |
+| Real-time todo sync | 🔜 | Subscribe to todos table — Phase 2 (next) |
 | Build step (env injection) | 🔜 | For Supabase keys via Cloudflare Pages |
 | Edit Mode (in-session) | 🔜 | Edit data during session, not just Prep Mode |
 | Session history | 🔜 | Store + view past sessions |

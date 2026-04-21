@@ -8,11 +8,11 @@
 
 ## 🎯 Current State
 
-**App status:** Feature-complete v1. Production-ready single HTML file (`Cadence.html`).
+**App status:** Feature-complete v1. Phase 1 (Supabase migration) complete and live on `main`.
 
-**Current phase:** Supabase migration — replacing localStorage with persistent cloud database for cross-device sync.
+**Current phase:** Phase 2 planning — real-time subscriptions so Chad and Joelle see each other's changes live without refresh.
 
-**Immediate next task:** Add Supabase JS client, replace localStorage calls, set up session management.
+**Immediate next task:** Decide Phase 2 scope and approach (see Parking Lot). Red-team Phase 1 before committing to Phase 2.
 
 ---
 
@@ -34,6 +34,9 @@
 | 2026-04-21 | Design system locked | Outfit + Playfair Display. Cream/Ink/Green/Coral/Amber/Purple palette. Do not introduce new colors without discussion. |
 | 2026-04-21 | Tagline: **"A Family Budget App"** | Used on Welcome screen and `<title>` tag as "Cadence · A Family Budget App". Tagline only — not part of the brand name. |
 | 2026-04-21 | Mobile-first for Our Lists, desktop-first for budget screens | Joelle uses lists on iPhone. Budget review happens on desktop during Money Date. |
+| 2026-04-21 | Phase 1 complete: all `moneydate_*` localStorage keys → Supabase | Session-scoped: todos, priorities, notes. Family-scoped: upcoming_notes, budget_data. `moneydate_screen` stays in localStorage (nav state only). |
+| 2026-04-21 | Session definition: open until Prep Mode Save & Apply closes it | Prep Mode is the session boundary. One open session at a time. On load: reuse open session or auto-create one. |
+| 2026-04-21 | Supabase anon key committed to source | Anon key is public by design; RLS `family_id = 'stewarts'` protects data. Acceptable for a private family app. |
 
 ---
 
@@ -41,8 +44,9 @@
 
 | Question | Context |
 |---|---|
-| Where do Supabase keys live? | Inlined JS constants for now. Needs a decision on whether to add a Cloudflare Pages build step for env var injection before the keys are added. Do not commit real keys to GitHub without confirming this. |
-| Session management on load | Schema has `sessions` table. On app load: find open session or create new one. What defines "same session" — same calendar day? Or until explicitly closed? |
+| PrepMode "Last Session" tab staleness | `INIT.todos` is populated at app load. If todos were added mid-session before opening Prep Mode, the Last Session tab shows the load-time snapshot, not current state. Does this need a re-fetch on PrepMode open? |
+| UpcomingChanges debounce | `saveUpcomingNote` fires on every keystroke. Fine for now (5 fields, low traffic), but worth deciding if we ever see flicker or race conditions. |
+| Phase 2 scope | Real-time on todos only? Or todos + priorities + notes + upcoming_notes? Starting narrow is safer. |
 
 ---
 
@@ -50,7 +54,7 @@
 
 | Idea | Notes |
 |---|---|
-| Real-time sync (Phase 2) | Supabase `postgres_changes` subscriptions on todos, priorities, notes. Do after Phase 1 is stable. |
+| **Real-time sync (Phase 2)** | **Active next phase.** Supabase `postgres_changes` channel subscriptions on todos, priorities, notes. Start with todos only; expand if stable. Do after Phase 1 is confirmed working in production. |
 | Edit Mode (in-session data editing) | Let Chad update a balance mid-session without going to Prep Mode. Needs a lightweight UI — not a full Prep Mode clone. |
 | Session history | Store each completed session. View past sessions. Foundation for trend tracking. |
 | Bank CSV import | Drag-and-drop CSV, auto-categorize, update spending averages. Needs session history first. |
@@ -83,6 +87,8 @@
 ---
 
 ## 📝 Change Log
+
+**[2026-04-21]** — Phase 1 complete. localStorage → Supabase migration shipped and merged to main. `db` module added with full CRUD for all five data types. `currentSessionId` tracks open session. Session persists until Prep Mode Save & Apply. Cross-device data persistence now live.
 
 **[2026-04-21]** — Founding docs written. App is Cadence v1 (production-ready). Supabase migration is the active task. All architectural decisions locked.
 
