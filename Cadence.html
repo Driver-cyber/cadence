@@ -1192,10 +1192,10 @@ const OurListsScreen = () => {
         {/* Mobile Header */}
         <div style={{ background:'#fff', borderBottom:`1px solid ${T.border}`, padding:'16px 20px 0', flexShrink:0 }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-            <div>
+            <button onClick={() => { window.location.hash = 'welcome'; }} style={{ background:'none', border:'none', padding:0, cursor:'pointer', textAlign:'left' }}>
               <p style={{ fontWeight:800, fontSize:20 }}>💚 Cadence</p>
               <p style={{ fontSize:12, color:T.dim }}>{allDone}/{allTotal} items done</p>
-            </div>
+            </button>
             <div style={{ width:80 }}>
               <Bar val={allDone} max={allTotal||1} color={T.green} h={6} />
             </div>
@@ -1931,6 +1931,16 @@ const OurList = () => {
   const [copied, setCopied] = useState(false);
   const [addError, setAddError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [currentHash, setCurrentHash] = useState(() => window.location.hash.replace('#','').toLowerCase());
+
+  useEffect(() => {
+    const onHash = () => setCurrentHash(window.location.hash.replace('#','').toLowerCase());
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
+  // Hide on Our Lists screen — it's already the full list view
+  if (currentHash === 'ourlist' || currentHash === 'lists') return null;
 
   // Re-sync from Supabase when panel opens so changes from OurLists show up
   useEffect(() => {
