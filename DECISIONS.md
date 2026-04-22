@@ -8,9 +8,9 @@
 
 ## 🎯 Current State
 
-**App status:** Feature-complete v1. Phase 1 (Supabase migration) complete, hardened, and live on `main`. PWA-ready: favicon, icons, manifest, and home-screen shortcut all set. Our Lists mobile UX polished. Supabase CDN resilience hardened for Safari standalone mode.
+**App status:** Feature-complete v1. Phase 1 (Supabase migration) complete, hardened, and live on `main`. PWA-ready: favicon, icons, manifest, and home-screen shortcut all set. Our Lists mobile UX polished. Supabase CDN resilience hardened for Safari standalone mode. Todo/note editing with due dates shipped. Last Session accomplishment screen and animated checkboxes shipped on feature branch (pending merge).
 
-**Current phase:** Phase 2 planning — scope decision is the first task next session.
+**Current phase:** Phase 2 planning — scope decision is the first task next session. Merge current feature branch first.
 
 **Immediate next task:** Phase 2 brainstorm — decide real-time scope (todos only vs. all tables), and whether any other features (action items tab, session history stub) belong in Phase 2 before real-time work starts.
 
@@ -46,6 +46,10 @@
 | 2026-04-22 | Supabase offline resilience — `sb` null guard | `sb` created with optional chaining; if CDN blocked, `sb = null` and script continues. All `db` methods guard `if (!sb)`: init returns early (DEFAULT_D + empty todos), writes are no-ops, reads return INIT defaults. App is fully usable even when Supabase is unavailable. 8-second fallback timeout also added to App init. |
 | 2026-04-22 | OurListsScreen home button uses `onGoHome` prop | Was setting `window.location.hash` directly (unreliable in iOS Safari standalone). Now App passes `onGoHome={() => go(0)}` as a prop — calls React state and hash atomically, same as the desktop nav button. |
 | 2026-04-22 | Our Lists tab bar: counts removed from tab buttons | `(done/total)` badges inside tab buttons made them too wide on narrow iPhones. Overall count is shown in the header. Tabs now fit natively on all iPhone widths. |
+| 2026-04-22 | `cadence-tracker.html` added as a founding doc | Visual priority board (walnut/amber/wheat design, Plus Jakarta Sans + Fraunces). Machine-readable `<script id="tracker-data" type="application/json">` block at bottom feeds cross-project dashboard at project-dashboard-6a7.pages.dev. Top-3 priorities kept current by Claude each session. |
+| 2026-04-22 | Todo + note enhancements shipped | Tap-to-expand detail card with editable text and optional due date on todos and notes. Auto-sort: dated → undated → completed (todos); dated → undated (notes). Completed todos sink to bottom, preserved for recap. |
+| 2026-04-22 | Last Session screen added as screen 1 | Replaces import flow on Welcome. Shows completed todos from most recently closed session — celebratory green banner if items done, Chad/Joelle cards with progress bars. Import flow removed from Welcome (roll-forward lives in Prep Mode). |
+| 2026-04-22 | Animated CheckBox component shipped | Custom 3-layer animation: SVG spring-pop box (`cb-pop`), checkmark stroke draw (`cb-draw`), Cadence-palette particle burst (`cb-burst`). Applied to mobile OurLists, desktop OurLists, and floating bubble. Only fires on check, not on load or uncheck. |
 
 ---
 
@@ -97,6 +101,8 @@
 ---
 
 ## 📝 Change Log
+
+**[2026-04-22]** — Build tracker added. `cadence-tracker.html` created as a founding doc — walnut/amber/wheat visual priority board with machine-readable JSON block feeding cross-project dashboard. CLAUDE.md updated with tracker check in Session Protocol and tracker maintenance rule. Initial top-3: (1) merge feature branch, (2) Phase 2 real-time sync, (3) session history UI. Todo/note editing with due dates, Last Session screen, and animated CheckBox component shipped on current feature branch.
 
 **[2026-04-22]** — PWA mobile hardening. Fixed blank screen in Safari standalone mode: Supabase CDN switched from `cdn.jsdelivr.net` to `unpkg.com`; `sb` creation now uses optional chaining so a blocked CDN no longer crashes the script; all `db` methods guard against `sb = null`. Added 8-second fallback so `db.init()` timeout doesn't leave app frozen. Fixed Our Lists home button to use `onGoHome` prop (was setting hash directly — unreliable in standalone). Tab bar counts removed from tab pills so all 4 tabs fit on any iPhone. `site.webmanifest` `start_url` changed to `/#lists` so Joelle's home-screen icon launches directly to lists.
 

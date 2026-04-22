@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cadence · Build Tracker</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --walnut:  #2C1A0E;
+      --walnut2: #3D2410;
+      --walnut3: #5A3820;
+      --amber:   #F2A24A;
+      --amber2:  #C07A12;
+      --wheat:   #F5DEB3;
+      --wheat2:  #E8C98A;
+      --cream:   #FDF6EC;
+      --muted:   #A07850;
+      --green:   #4CAF82;
+      --coral:   #E06055;
+      --purple:  #9B8FD0;
+    }
+
+    body {
+      background: var(--walnut);
+      color: var(--wheat);
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      min-height: 100vh;
+      padding: 2rem 1rem 4rem;
+    }
+
+    .container {
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    /* ── Header ── */
+    .header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+
+    .project-name {
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: 2.4rem;
+      font-weight: 700;
+      color: var(--amber);
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+
+    .project-tagline {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-top: 0.35rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .phase-badge {
+      display: inline-block;
+      margin-top: 1rem;
+      padding: 0.3rem 0.85rem;
+      background: var(--walnut2);
+      border: 1px solid var(--walnut3);
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--amber);
+      letter-spacing: 0.04em;
+    }
+
+    .updated {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 0.5rem;
+    }
+
+    /* ── Section ── */
+    .section-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.75rem;
+      padding-left: 0.1rem;
+    }
+
+    /* ── Priority Cards ── */
+    .priority-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-bottom: 2rem;
+    }
+
+    .priority-card {
+      background: var(--walnut2);
+      border: 1px solid var(--walnut3);
+      border-radius: 12px;
+      padding: 1rem 1.1rem;
+      display: grid;
+      grid-template-columns: 2rem 1fr auto;
+      gap: 0.75rem;
+      align-items: start;
+    }
+
+    .priority-card.rank-1 { border-left: 3px solid var(--amber); }
+    .priority-card.rank-2 { border-left: 3px solid var(--wheat2); }
+    .priority-card.rank-3 { border-left: 3px solid var(--muted); }
+
+    .rank-num {
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: 1.4rem;
+      font-weight: 700;
+      line-height: 1;
+      padding-top: 0.1rem;
+    }
+
+    .rank-1 .rank-num { color: var(--amber); }
+    .rank-2 .rank-num { color: var(--wheat2); }
+    .rank-3 .rank-num { color: var(--muted); }
+
+    .card-body { min-width: 0; }
+
+    .card-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--wheat);
+      line-height: 1.3;
+      margin-bottom: 0.3rem;
+    }
+
+    .card-desc {
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .status-pill {
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      white-space: nowrap;
+      margin-top: 0.1rem;
+      letter-spacing: 0.03em;
+    }
+
+    .status-ready    { background: rgba(76,175,130,0.15); color: var(--green); }
+    .status-planning { background: rgba(242,162,74,0.15); color: var(--amber); }
+    .status-future   { background: rgba(160,120,80,0.12); color: var(--muted); }
+
+    /* ── Divider ── */
+    .divider {
+      border: none;
+      border-top: 1px solid var(--walnut3);
+      margin: 1.75rem 0;
+    }
+
+    /* ── Backlog ── */
+    .backlog-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .backlog-item {
+      background: var(--walnut2);
+      border: 1px solid var(--walnut3);
+      border-radius: 8px;
+      padding: 0.65rem 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+    }
+
+    .backlog-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--walnut3);
+      flex-shrink: 0;
+    }
+
+    .backlog-text {
+      font-size: 0.82rem;
+      color: var(--muted);
+      flex: 1;
+    }
+
+    .backlog-tag {
+      font-size: 0.68rem;
+      color: var(--walnut3);
+      letter-spacing: 0.04em;
+    }
+
+    /* ── Footer ── */
+    .footer {
+      text-align: center;
+      margin-top: 3rem;
+      font-size: 0.72rem;
+      color: var(--walnut3);
+    }
+
+    .footer a {
+      color: var(--muted);
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <header class="header">
+      <div class="project-name">Cadence</div>
+      <div class="project-tagline">Stewart Family Finance &amp; Lists · Build Tracker</div>
+      <div class="phase-badge">Phase 2 Planning</div>
+      <div class="updated" id="updated-label"></div>
+    </header>
+
+    <div class="section-label">Top 3 Priorities</div>
+    <div class="priority-list" id="priority-list"></div>
+
+    <hr class="divider">
+
+    <div class="section-label">Backlog</div>
+    <div class="backlog-list" id="backlog-list"></div>
+
+    <div class="footer">
+      <a href="https://github.com/Driver-cyber/cadence" target="_blank">Driver-cyber/cadence</a>
+      &nbsp;·&nbsp; Feeds project-dashboard-6a7.pages.dev
+    </div>
+
+  </div>
+
+  <script>
+    const data = JSON.parse(document.getElementById('tracker-data').textContent);
+
+    document.getElementById('updated-label').textContent = 'Updated ' + data.updated;
+
+    const rankClass = ['rank-1','rank-2','rank-3'];
+    const pl = document.getElementById('priority-list');
+    data.top3.forEach((item, i) => {
+      pl.innerHTML += `
+        <div class="priority-card ${rankClass[i]}">
+          <span class="rank-num">${i + 1}</span>
+          <div class="card-body">
+            <div class="card-title">${item.title}</div>
+            <div class="card-desc">${item.desc}</div>
+          </div>
+          <span class="status-pill status-${item.status}">${item.statusLabel}</span>
+        </div>`;
+    });
+
+    const bl = document.getElementById('backlog-list');
+    data.backlog.forEach(item => {
+      bl.innerHTML += `
+        <div class="backlog-item">
+          <div class="backlog-dot"></div>
+          <span class="backlog-text">${item.title}</span>
+          <span class="backlog-tag">${item.tag || ''}</span>
+        </div>`;
+    });
+  </script>
+
+  <script id="tracker-data" type="application/json">
+  {
+    "project": "Cadence",
+    "repo": "Driver-cyber/cadence",
+    "updated": "2026-04-22",
+    "phase": "Phase 2 Planning",
+    "branch": "claude/supabase-phase-1-u0RKn",
+    "deploy_url": "cadence.pages.dev",
+    "top3": [
+      {
+        "title": "Merge & deploy current branch",
+        "desc": "Todo editing, notes due dates, Last Session screen, and animated checkboxes are all on the feature branch — not yet on main or live.",
+        "status": "ready",
+        "statusLabel": "Ready to merge"
+      },
+      {
+        "title": "Phase 2: Real-time sync",
+        "desc": "Supabase postgres_changes subscriptions on todos (and optionally priorities + notes) so Chad & Joelle see each other's changes live without reload.",
+        "status": "planning",
+        "statusLabel": "Planning"
+      },
+      {
+        "title": "Session history UI",
+        "desc": "Last Session screen shows previous accomplishments — next step is a full history list so past sessions are browsable (foundation for annual Wrapped recap).",
+        "status": "future",
+        "statusLabel": "Future"
+      }
+    ],
+    "backlog": [
+      { "title": "Phase 2 scope decision — todos only vs. all tables", "tag": "decision" },
+      { "title": "Action items / upcoming budget tab", "tag": "feature" },
+      { "title": "Edit Mode — update balances mid-session without Prep Mode", "tag": "feature" },
+      { "title": "Annual Wrapped recap — visualize a year of Money Dates", "tag": "feature" },
+      { "title": "Bank CSV import — drag-and-drop, auto-categorize", "tag": "future" },
+      { "title": "Multi-month spending trends — track categories across sessions", "tag": "future" },
+      { "title": "Build step for env injection — Cloudflare Pages + secrets", "tag": "infra" }
+    ]
+  }
+  </script>
+</body>
+</html>
