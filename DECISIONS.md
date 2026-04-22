@@ -12,7 +12,7 @@
 
 **Current phase:** Phase 2 planning — scope decision is the first task next session. Merge current feature branch first.
 
-**Immediate next task:** Phase 2 brainstorm — decide real-time scope (todos only vs. all tables), and whether any other features (action items tab, session history stub) belong in Phase 2 before real-time work starts.
+**Immediate next task:** (1) Merge `claude/supabase-phase-1-u0RKn` → `main` to ship all session 2 work (todo/note editing, due dates, Last Session screen, animated checkboxes, build tracker). Then (2) Phase 2 brainstorm — decide real-time scope (todos only vs. all tables), and whether any other features (action items tab, session history stub) belong in Phase 2 before real-time work starts.
 
 ---
 
