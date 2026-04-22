@@ -265,8 +265,8 @@ const db = {
 
     Object.assign(INIT, {
       todos: {
-        chad:   allTodos.filter(t => t.person === 'chad').map(t => ({ id: t.id, text: t.text, done: t.done })),
-        joelle: allTodos.filter(t => t.person === 'joelle').map(t => ({ id: t.id, text: t.text, done: t.done })),
+        chad:   allTodos.filter(t => t.person === 'chad').map(t => ({ id: t.id, text: t.text, done: t.done, due_date: t.due_date, created_at: t.created_at })),
+        joelle: allTodos.filter(t => t.person === 'joelle').map(t => ({ id: t.id, text: t.text, done: t.done, due_date: t.due_date, created_at: t.created_at })),
       },
       priorities:    [0,1,2].map(i => pris.find(p => p.slot === i+1)?.text ?? ''),
       notes:         (notesRes.data || []).map(n => ({ id: n.id, text: n.text })),
@@ -286,6 +286,11 @@ const db = {
     if (!sb) return;
     sb.from('todos').update({ done, updated_at: new Date().toISOString() }).eq('id', id)
       .then(r => { if (r.error) console.error('toggleTodo failed:', r.error); });
+  },
+  updateTodo(id, text, dueDate) {
+    if (!sb) return;
+    sb.from('todos').update({ text, due_date: dueDate || null, updated_at: new Date().toISOString() }).eq('id', id)
+      .then(r => { if (r.error) console.error('updateTodo failed:', r.error); });
   },
   deleteTodo(id) {
     if (!sb) return;
@@ -312,6 +317,11 @@ const db = {
     if (!sb) return;
     sb.from('notes').delete().eq('id', id)
       .then(r => { if (r.error) console.error('deleteNote failed:', r.error); });
+  },
+  updateNote(id, text) {
+    if (!sb) return;
+    sb.from('notes').update({ text }).eq('id', id)
+      .then(r => { if (r.error) console.error('updateNote failed:', r.error); });
   },
 
   saveUpcomingNote(slot, text) {
@@ -352,8 +362,8 @@ const db = {
     const { data } = await sb.from('todos').select('*').eq('session_id', currentSessionId).order('sort_order');
     const rows = data || [];
     return {
-      chad:   rows.filter(t => t.person === 'chad').map(t => ({ id: t.id, text: t.text, done: t.done })),
-      joelle: rows.filter(t => t.person === 'joelle').map(t => ({ id: t.id, text: t.text, done: t.done })),
+      chad:   rows.filter(t => t.person === 'chad').map(t => ({ id: t.id, text: t.text, done: t.done, due_date: t.due_date, created_at: t.created_at })),
+      joelle: rows.filter(t => t.person === 'joelle').map(t => ({ id: t.id, text: t.text, done: t.done, due_date: t.due_date, created_at: t.created_at })),
     };
   },
   async loadPriorities() {
@@ -365,6 +375,16 @@ const db = {
     if (!sb) return INIT.notes;
     const { data } = await sb.from('notes').select('*').eq('session_id', currentSessionId).order('sort_order');
     return (data || []).map(n => ({ id: n.id, text: n.text }));
+  },
+  async loadLastSession() {
+    if (!sb) return null;
+    const { data: sessions } = await sb.from('sessions')
+      .select().eq('family_id', FAMILY_ID).not('completed_at', 'is', null)
+      .order('completed_at', { ascending: false }).limit(1);
+    const session = sessions?.[0];
+    if (!session) return null;
+    const { data: todos } = await sb.from('todos').select('*').eq('session_id', session.id).order('sort_order');
+    return { session, todos: todos || [] };
   },
 };
 
@@ -380,6 +400,19 @@ const T = {
 // ─── UTILS ────────────────────────────────────────────────────────────────────
 const $  = (n) => new Intl.NumberFormat('en-US', { style:'currency', currency:'USD', minimumFractionDigits:0, maximumFractionDigits:0 }).format(n);
 const $$ = (n) => new Intl.NumberFormat('en-US', { style:'currency', currency:'USD', minimumFractionDigits:2, maximumFractionDigits:2 }).format(n);
+
+const sortTodos = (arr) => {
+  const ts = s => s.created_at ? new Date(s.created_at).getTime() : 0;
+  const withDate = arr.filter(i => !i.done && i.due_date).sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
+  const noDate   = arr.filter(i => !i.done && !i.due_date).sort((a, b) => ts(a) - ts(b));
+  const done     = arr.filter(i => i.done).sort((a, b) => ts(a) - ts(b));
+  return [...withDate, ...noDate, ...done];
+};
+const formatDueDate = (dateStr) => {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T12:00:00');
+  return d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+};
 const monthsAhead = (n) => {
   const d = new Date(2026, 3, 1); d.setMonth(d.getMonth() + n);
   return d.toLocaleDateString('en-US', { month:'long', year:'numeric' });
@@ -425,191 +458,142 @@ const SectionHeader = ({ tag, tagColor, title, sub }) => (
   </div>
 );
 
-// ─── SESSION IMPORT PARSER ────────────────────────────────────────────────────
-const parseExport = (text) => {
-  const result = { chad: [], joelle: [], priorities: ['','',''], notes: [] };
-  let section = null;
-  const lines = text.split('\n');
-  lines.forEach(raw => {
-    const line = raw.trim();
-    if (line.includes("CHAD'S TO-DOS") || line === '--- Chad ---') { section = 'chad'; return; }
-    if (line.includes("JOELLE'S TO-DOS") || line === '--- Joelle ---') { section = 'joelle'; return; }
-    if (line.includes('PRIORITIES')) { section = 'priorities'; return; }
-    if (line.includes('NOTES')) { section = 'notesSection'; return; }
-    if (line.startsWith('---') || line.startsWith('===') || !line) return;
-
-    if (section === 'chad' || section === 'joelle') {
-      const done = line.startsWith('[x]');
-      const notDone = line.startsWith('[ ]');
-      if (done || notDone) {
-        result[section].push({ text: line.slice(4).trim(), done, id: Date.now() + Math.random() });
-      }
-    }
-    if (section === 'priorities') {
-      const m = line.match(/^Goal #(\d):\s*(.+)/);
-      if (m) result.priorities[parseInt(m[1])-1] = m[2];
-    }
-    if (section === 'notesSection') {
-      const m = line.match(/^\d+\.\s*(.+)/);
-      if (m) result.notes.push({ text: m[1], id: Date.now() + Math.random() });
-    }
-  });
-  return result;
-};
-
 // ─── SCREEN 0: WELCOME ────────────────────────────────────────────────────────
-const Welcome = ({ onStart, onPrep }) => {
-  const [mode, setMode] = useState('home'); // 'home' | 'import' | 'recap'
-  const [pasteText, setPasteText] = useState('');
-  const [parsed, setParsed] = useState(null);
-  const [rollForward, setRollForward] = useState(true);
-
-  const handleParse = () => {
-    const p = parseExport(pasteText);
-    const hasContent = p.chad.length > 0 || p.joelle.length > 0;
-    if (!hasContent) { alert("Couldn't find any to-do items in that text. Make sure you pasted the full exported session."); return; }
-    setParsed(p);
-    setMode('recap');
-  };
-
-  const handleStartWithImport = async () => {
-    if (rollForward && parsed) {
-      const rollChad   = parsed.chad.filter(i => !i.done);
-      const rollJoelle = parsed.joelle.filter(i => !i.done);
-      const chadOffset   = INIT.todos.chad.length;
-      const joelleOffset = INIT.todos.joelle.length;
-      await Promise.all([
-        ...rollChad.map((item, i) =>
-          db.addTodo('chad', item.text, chadOffset + i)
-            .then(data => INIT.todos.chad.push({ id: data.id, text: item.text, done: false }))
-        ),
-        ...rollJoelle.map((item, i) =>
-          db.addTodo('joelle', item.text, joelleOffset + i)
-            .then(data => INIT.todos.joelle.push({ id: data.id, text: item.text, done: false }))
-        ),
-      ]);
-    }
-    onStart();
-  };
-
-  const chadDone = parsed ? parsed.chad.filter(i=>i.done).length : 0;
-  const joelleDone = parsed ? parsed.joelle.filter(i=>i.done).length : 0;
-  const chadRoll = parsed ? parsed.chad.filter(i=>!i.done).length : 0;
-  const joelleRoll = parsed ? parsed.joelle.filter(i=>!i.done).length : 0;
-
-  if (mode === 'import') return (
-    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', padding:'40px 60px', gap:20, maxWidth:680, margin:'0 auto' }}>
-      <button onClick={()=>setMode('home')} style={{ alignSelf:'flex-start', background:'none', border:'none', cursor:'pointer', color:T.dim, fontSize:14 }}>← Back</button>
-      <div style={{ fontSize:48 }}>📋</div>
-      <h2 style={{ fontFamily:"'Playfair Display', serif", fontSize:34, fontWeight:700, textAlign:'center', lineHeight:1.1 }}>Import Previous Session</h2>
-      <p style={{ color:T.dim, fontSize:14, textAlign:'center', lineHeight:1.7 }}>Paste the exported text from your last session. We'll show you a recap and let you roll any unfinished items forward into this session.</p>
-      <textarea
-        value={pasteText}
-        onChange={e=>setPasteText(e.target.value)}
-        placeholder="Paste exported session text here..."
-        rows={10}
-        style={{ width:'100%', border:`1px solid ${T.border}`, borderRadius:14, padding:'16px', fontSize:13, fontFamily:'monospace', outline:'none', resize:'vertical', background:T.card, color:T.ink, lineHeight:1.6 }}
-      />
-      <button onClick={handleParse} disabled={!pasteText.trim()} style={{
-        background: pasteText.trim() ? T.ink : T.border, color:'#fff', border:'none', borderRadius:100,
-        padding:'13px 40px', fontSize:15, fontWeight:700, cursor: pasteText.trim() ? 'pointer' : 'default'
-      }}>Parse & Show Recap →</button>
+const Welcome = ({ onStart, onPrep }) => (
+  <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', textAlign:'center', padding: '40px 60px', gap: 24 }}>
+    <div style={{ fontSize: 56 }}>💚</div>
+    <div>
+      <h1 style={{ fontFamily:"'Playfair Display', serif", fontSize: 54, fontWeight: 700, lineHeight: 1.08, marginBottom: 12 }}>
+        <em>Cadence</em>
+      </h1>
+      <p style={{ color: T.dim, fontSize: 13, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 4 }}>A Family Budget App</p>
+      <p style={{ color: T.dim, fontSize: 15, marginBottom: 6 }}>{D.date}</p>
+      <p style={{ color: T.dim, fontSize: 15, maxWidth: 520, lineHeight: 1.7 }}>
+        Your family's financial rhythm — the numbers that matter, a clear plan, and a stronger connection every session.
+      </p>
     </div>
-  );
-
-  if (mode === 'recap' && parsed) return (
-    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', padding:'40px 60px', gap:20, maxWidth:700, margin:'0 auto' }}>
-      <div style={{ fontSize:48 }}>🏆</div>
-      <h2 style={{ fontFamily:"'Playfair Display', serif", fontSize:34, fontWeight:700, textAlign:'center', lineHeight:1.1 }}>Session Recap</h2>
-      <p style={{ color:T.dim, fontSize:14, textAlign:'center' }}>Here's how the last session wrapped up.</p>
-
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, width:'100%' }}>
-        {[
-          { name:'Chad', done: chadDone, total: parsed.chad.length, roll: chadRoll, color: T.green },
-          { name:'Joelle', done: joelleDone, total: parsed.joelle.length, roll: joelleRoll, color: T.purple },
-        ].map(p => (
-          <div key={p.name} style={{ background:T.card, border:`1px solid ${T.border}`, borderRadius:16, padding:'20px 22px' }}>
-            <p style={{ fontSize:16, fontWeight:800, marginBottom:12 }}>{p.name}</p>
-            <p style={{ fontSize:36, fontWeight:800, color: p.done === p.total && p.total > 0 ? T.green : T.ink, lineHeight:1 }}>{p.done}/{p.total}</p>
-            <p style={{ fontSize:13, color:T.dim, marginTop:4, marginBottom:14 }}>items completed</p>
-            {p.total > 0 && <Bar val={p.done} max={p.total} color={p.color} h={8} />}
-            {p.roll > 0 && <p style={{ fontSize:12, color:T.amber, marginTop:10, fontWeight:600 }}>↩ {p.roll} unfinished item{p.roll>1?'s':''}</p>}
-          </div>
-        ))}
-      </div>
-
-      {(chadRoll > 0 || joelleRoll > 0) && (
-        <div onClick={()=>setRollForward(r=>!r)} style={{
-          display:'flex', alignItems:'center', gap:14, background: rollForward ? T.greenBg : T.card,
-          border:`1px solid ${rollForward ? T.greenMid : T.border}`, borderRadius:14, padding:'16px 20px', cursor:'pointer', width:'100%'
-        }}>
-          <div style={{ width:22, height:22, borderRadius:7, border:`2px solid ${rollForward ? T.green : T.border}`, background: rollForward ? T.green : 'transparent', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
-            {rollForward && <span style={{ color:'#fff', fontSize:12, fontWeight:800 }}>✓</span>}
-          </div>
-          <div>
-            <p style={{ fontSize:14, fontWeight:700 }}>Roll {chadRoll + joelleRoll} unfinished item{(chadRoll+joelleRoll)>1?'s':''} into this session</p>
-            <p style={{ fontSize:12, color:T.dim, marginTop:2 }}>They'll appear at the top of Chad's and Joelle's to-do lists</p>
-          </div>
+    <div style={{ display:'flex', flexDirection:'column', gap: 10, width:'100%', maxWidth: 580 }}>
+      <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.2, textTransform:'uppercase', color: T.dim, marginBottom: 2 }}>How this works</p>
+      {[
+        { n:1, text:"Hit the button below together — you're already doing it right." },
+        { n:2, text:'Move through each screen using Next → at the bottom. Read it together out loud.' },
+        { n:3, text:'Use the sliders on Spending, Debt, and Goals screens to explore what-ifs in real time.' },
+        { n:4, text:'On Big Decisions, pick a topic and talk through the question at the bottom.' },
+        { n:5, text:'Your to-dos and notes sync automatically — everything carries forward to the next session.' },
+      ].map(({ n, text }) => (
+        <div key={n} style={{ display:'flex', alignItems:'flex-start', gap: 14, background: T.card, border:`1px solid ${T.border}`, borderRadius: 12, padding:'12px 16px', textAlign:'left' }}>
+          <div style={{ width: 26, height: 26, borderRadius: '50%', background: T.ink, color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize: 12, fontWeight: 800, flexShrink: 0 }}>{n}</div>
+          <p style={{ fontSize: 13, color: T.ink, lineHeight: 1.5, marginTop: 2 }}>{text}</p>
         </div>
-      )}
+      ))}
+    </div>
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:10 }}>
+      <button onClick={onStart} style={{
+        background: T.ink, color:'#fff', border:'none', borderRadius: 100, padding:'15px 48px',
+        fontSize: 17, fontWeight: 700, cursor:'pointer', letterSpacing: 0.3
+      }}>Let's do this →</button>
+      <button onClick={onPrep} style={{
+        background:'none', border:`1px solid ${T.border}`, borderRadius:100, padding:'10px 20px',
+        fontSize:13, cursor:'pointer', color:T.dim, fontWeight:600
+      }}>🔧 Prep next session</button>
+      <p style={{ color: T.dim, fontSize: 12 }}>8 topics · ~35–45 min together</p>
+    </div>
+  </div>
+);
 
-      <div style={{ display:'flex', gap:12, width:'100%' }}>
-        <button onClick={()=>setMode('import')} style={{ flex:1, background:'none', border:`1px solid ${T.border}`, borderRadius:100, padding:'12px', fontSize:14, cursor:'pointer', color:T.dim }}>← Re-paste</button>
-        <button onClick={handleStartWithImport} style={{ flex:2, background:T.ink, color:'#fff', border:'none', borderRadius:100, padding:'12px', fontSize:15, fontWeight:700, cursor:'pointer' }}>Start this session →</button>
-      </div>
+// ─── SCREEN 1: LAST SESSION ───────────────────────────────────────────────────
+const LastSession = () => {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    db.loadLastSession().then(d => { setData(d); setLoading(false); });
+  }, []);
+
+  if (loading) return (
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100%' }}>
+      <p style={{ color:T.dim, fontSize:15 }}>Loading…</p>
     </div>
   );
+
+  if (!data || !data.todos.length) return (
+    <div style={{ padding:'32px 48px', maxWidth:920, margin:'0 auto' }}>
+      <SectionHeader tag="Last Session" tagColor="green" title="What We Accomplished" sub="A look back at what we checked off together." />
+      <Card style={{ textAlign:'center', padding:'48px 32px' }}>
+        <p style={{ fontSize:44, marginBottom:14 }}>🌱</p>
+        <p style={{ fontSize:20, fontWeight:700, marginBottom:8 }}>This is your first session!</p>
+        <p style={{ color:T.dim, fontSize:14, lineHeight:1.7, maxWidth:480, margin:'0 auto' }}>After you complete your first Money Date and run Prep Mode, this screen will celebrate everything you accomplished together.</p>
+      </Card>
+    </div>
+  );
+
+  const chad = data.todos.filter(t => t.person === 'chad');
+  const joelle = data.todos.filter(t => t.person === 'joelle');
+  const chadDone = chad.filter(t => t.done);
+  const joelleDone = joelle.filter(t => t.done);
+  const totalDone = chadDone.length + joelleDone.length;
+  const total = chad.length + joelle.length;
+  const sessionDate = new Date(data.session.session_date + 'T12:00:00').toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
+  const incompleteCount = total - totalDone;
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', textAlign:'center', padding: '40px 60px', gap: 24 }}>
-      <div style={{ fontSize: 56 }}>💚</div>
-      <div>
-        <h1 style={{ fontFamily:"'Playfair Display', serif", fontSize: 54, fontWeight: 700, lineHeight: 1.08, marginBottom: 12 }}>
-          <em>Cadence</em>
-        </h1>
-        <p style={{ color: T.dim, fontSize: 13, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.dim, marginBottom: 4 }}>A Family Budget App</p>
-        <p style={{ color: T.dim, fontSize: 15, marginBottom: 6 }}>{D.date}</p>
-        <p style={{ color: T.dim, fontSize: 15, maxWidth: 520, lineHeight: 1.7 }}>
-          Your family's financial rhythm — the numbers that matter, a clear plan, and a stronger connection every session.
-        </p>
-      </div>
-      <div style={{ display:'flex', flexDirection:'column', gap: 10, width:'100%', maxWidth: 580 }}>
-        <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.2, textTransform:'uppercase', color: T.dim, marginBottom: 2 }}>How this works</p>
+    <div style={{ padding:'32px 48px', maxWidth:920, margin:'0 auto' }}>
+      <SectionHeader tag="Last Session" tagColor="green" title="What We Accomplished" sub={`Session from ${sessionDate} · ${totalDone} of ${total} item${total!==1?'s':''} completed`} />
+
+      {totalDone > 0 ? (
+        <Card style={{ background:'linear-gradient(135deg, #173528 0%, #265842 100%)', border:'none', color:'#fff', textAlign:'center', padding:'32px', marginBottom:16 }}>
+          <p style={{ fontSize:44, marginBottom:8 }}>🎉</p>
+          <p style={{ fontFamily:"'Playfair Display', serif", fontSize:28, fontWeight:700, marginBottom:8 }}>You crushed it.</p>
+          <p style={{ opacity:.75, fontSize:14, maxWidth:480, margin:'0 auto', lineHeight:1.7 }}>
+            {totalDone} item{totalDone>1?'s':''} checked off last session. That's real progress — and it compounds every time you show up.
+          </p>
+        </Card>
+      ) : (
+        <Card style={{ background:T.amberBg, border:`1px solid ${T.amberMid}`, textAlign:'center', padding:'24px', marginBottom:16 }}>
+          <p style={{ fontSize:15, color:T.amber, fontWeight:600 }}>Nothing was marked done last session — that's okay. Fresh start.</p>
+        </Card>
+      )}
+
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:16 }}>
         {[
-          { n:1, text:'Hit the button below together — you\'re already doing it right.' },
-          { n:2, text:'Move through each screen using Next → at the bottom. Read it together out loud.' },
-          { n:3, text:'Use the sliders on Spending, Debt, and Goals screens to explore what-ifs in real time.' },
-          { n:4, text:'On Big Decisions, pick a topic and talk through the question at the bottom.' },
-          { n:5, text:'Add to-dos & notes in the ✅ bubble — export at the end to carry them forward.' },
-        ].map(({ n, text }) => (
-          <div key={n} style={{ display:'flex', alignItems:'flex-start', gap: 14, background: T.card, border:`1px solid ${T.border}`, borderRadius: 12, padding:'12px 16px', textAlign:'left' }}>
-            <div style={{ width: 26, height: 26, borderRadius: '50%', background: T.ink, color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize: 12, fontWeight: 800, flexShrink: 0 }}>{n}</div>
-            <p style={{ fontSize: 13, color: T.ink, lineHeight: 1.5, marginTop: 2 }}>{text}</p>
-          </div>
+          { name:'Chad', emoji:'👦', items:chad, done:chadDone, color:T.green },
+          { name:'Joelle', emoji:'👩', items:joelle, done:joelleDone, color:T.purple },
+        ].map(p => (
+          <Card key={p.name}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:12 }}>
+              <p style={{ fontSize:16, fontWeight:800 }}>{p.emoji} {p.name}</p>
+              <span style={{ fontSize:26, fontWeight:800, color: p.done.length > 0 ? p.color : T.dim, lineHeight:1 }}>{p.done.length}/{p.items.length}</span>
+            </div>
+            {p.items.length > 0 && <Bar val={p.done.length} max={p.items.length} color={p.color} h={6} />}
+            {p.done.length > 0 && (
+              <div style={{ marginTop:14 }}>
+                {p.done.map(t => (
+                  <div key={t.id} style={{ display:'flex', alignItems:'flex-start', gap:8, padding:'6px 0', borderBottom:`1px solid ${T.border}` }}>
+                    <span style={{ color:T.green, fontSize:13, fontWeight:800, flexShrink:0, marginTop:1 }}>✓</span>
+                    <p style={{ fontSize:13, color:T.dim, textDecoration:'line-through', lineHeight:1.4 }}>{t.text}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            {p.done.length === 0 && p.items.length > 0 && <p style={{ fontSize:13, color:T.dim, marginTop:10 }}>Nothing completed — rolled forward.</p>}
+            {p.items.length === 0 && <p style={{ fontSize:13, color:T.dim, marginTop:10 }}>No items last session.</p>}
+          </Card>
         ))}
       </div>
-      <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:10 }}>
-        <button onClick={onStart} style={{
-          background: T.ink, color:'#fff', border:'none', borderRadius: 100, padding:'15px 48px',
-          fontSize: 17, fontWeight: 700, cursor:'pointer', letterSpacing: 0.3
-        }}>Let's do this →</button>
-        <div style={{ display:'flex', gap:10 }}>
-          <button onClick={()=>setMode('import')} style={{
-            background:'none', border:`1px solid ${T.border}`, borderRadius:100, padding:'10px 20px',
-            fontSize:13, cursor:'pointer', color:T.dim, fontWeight:600
-          }}>📋 Import last session</button>
-          <button onClick={onPrep} style={{
-            background:'none', border:`1px solid ${T.border}`, borderRadius:100, padding:'10px 20px',
-            fontSize:13, cursor:'pointer', color:T.dim, fontWeight:600
-          }}>🔧 Prep next session</button>
-        </div>
-        <p style={{ color: T.dim, fontSize: 12 }}>8 topics · ~35–45 min together</p>
-      </div>
+
+      {incompleteCount > 0 && (
+        <Card style={{ background:T.amberBg, border:`1px solid ${T.amberMid}` }}>
+          <p style={{ fontSize:13, fontWeight:700, color:T.amber, marginBottom:4 }}>↩ Rolled forward</p>
+          <p style={{ fontSize:14, color:T.ink, lineHeight:1.6 }}>
+            {incompleteCount} item{incompleteCount>1?'s':''} from last session carried over to your current lists.
+          </p>
+        </Card>
+      )}
     </div>
   );
 };
 
-// ─── SCREEN 1: BIG PICTURE ────────────────────────────────────────────────────
+// ─── SCREEN 2: BIG PICTURE ────────────────────────────────────────────────────
 const BigPicture = () => {
   const a = D.accounts;
   return (
@@ -1149,13 +1133,44 @@ const OurListsScreen = ({ onGoHome }) => {
   const [input, setInput] = useState('');
   const [noteInput, setNoteInput] = useState('');
   const [addError, setAddError] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
+  const [editText, setEditText] = useState('');
+  const [editDate, setEditDate] = useState('');
+  const [expandedNoteId, setExpandedNoteId] = useState(null);
+  const [editNoteText, setEditNoteText] = useState('');
+
+  const openExpand = (item) => {
+    if (expandedId === item.id) { setExpandedId(null); return; }
+    setExpandedId(item.id);
+    setEditText(item.text);
+    setEditDate(item.due_date || '');
+  };
+  const saveTodo = (p, id) => {
+    const newText = editText.trim();
+    if (!newText) return;
+    setItems(prev => ({ ...prev, [p]: prev[p].map(i => i.id === id ? { ...i, text: newText, due_date: editDate || null } : i) }));
+    db.updateTodo(id, newText, editDate || null);
+    setExpandedId(null);
+  };
+  const openNoteExpand = (n) => {
+    if (expandedNoteId === n.id) { setExpandedNoteId(null); return; }
+    setExpandedNoteId(n.id);
+    setEditNoteText(n.text);
+  };
+  const saveNote = (id) => {
+    const newText = editNoteText.trim();
+    if (!newText) return;
+    setNotesList(prev => prev.map(n => n.id === id ? { ...n, text: newText } : n));
+    db.updateNote(id, newText);
+    setExpandedNoteId(null);
+  };
 
   const add = async () => {
     const t = input.trim();
     if (!t || (tab !== 'chad' && tab !== 'joelle')) return;
     try {
       const data = await db.addTodo(tab, t, items[tab].length);
-      setItems(prev => ({ ...prev, [tab]: [...prev[tab], { id: data.id, text: t, done: false }] }));
+      setItems(prev => ({ ...prev, [tab]: [...prev[tab], { id: data.id, text: t, done: false, due_date: null, created_at: data.created_at }] }));
       setInput('');
     } catch (err) {
       console.error('addTodo failed:', err);
@@ -1249,21 +1264,58 @@ const OurListsScreen = ({ onGoHome }) => {
                   <p style={{ fontSize:14, marginTop:4 }}>Add something below</p>
                 </div>
               )}
-              {items[tab].map(item => (
-                <div key={item.id} style={{ display:'flex', alignItems:'center', gap:14, marginBottom:10,
-                  background: item.done ? T.greenBg : '#fff', border:`1px solid ${item.done ? T.greenMid : T.border}`,
-                  borderRadius:16, padding:'16px 18px', minHeight:60, transition:'all .15s' }}>
-                  <div onClick={()=>toggle(tab, item.id)} style={{
-                    width:28, height:28, borderRadius:9, border:`2.5px solid ${item.done ? T.green : '#C8C8CC'}`,
-                    background: item.done ? T.green : 'transparent', flexShrink:0, cursor:'pointer',
-                    display:'flex', alignItems:'center', justifyContent:'center', transition:'all .15s'
-                  }}>
-                    {item.done && <span style={{ color:'#fff', fontSize:14, fontWeight:800, lineHeight:1 }}>✓</span>}
+              {sortTodos(items[tab]).map(item => {
+                const isExp = expandedId === item.id;
+                return (
+                  <div key={item.id} style={{ marginBottom:10 }}>
+                    <div style={{
+                      display:'flex', alignItems:'center', gap:12,
+                      background: item.done ? T.greenBg : '#fff',
+                      border:`1px solid ${item.done ? T.greenMid : T.border}`,
+                      borderRadius: isExp ? '16px 16px 0 0' : 16,
+                      padding:'14px 16px', minHeight:56, transition:'background .15s'
+                    }}>
+                      <div onClick={()=>toggle(tab, item.id)} style={{
+                        width:28, height:28, borderRadius:9, border:`2.5px solid ${item.done ? T.green : '#C8C8CC'}`,
+                        background: item.done ? T.green : 'transparent', flexShrink:0, cursor:'pointer',
+                        display:'flex', alignItems:'center', justifyContent:'center', transition:'all .15s'
+                      }}>
+                        {item.done && <span style={{ color:'#fff', fontSize:14, fontWeight:800, lineHeight:1 }}>✓</span>}
+                      </div>
+                      <div onClick={()=>openExpand(item)} style={{ flex:1, cursor:'pointer' }}>
+                        <p style={{ fontSize:16, color: item.done ? T.dim : T.ink, textDecoration: item.done ? 'line-through' : 'none', lineHeight:1.4 }}>{item.text}</p>
+                        {item.due_date && !item.done && (
+                          <p style={{ fontSize:12, color:T.amber, marginTop:2, fontWeight:600 }}>📅 {formatDueDate(item.due_date)}</p>
+                        )}
+                      </div>
+                      <span style={{ fontSize:10, color:T.dim, marginRight:2 }}>{isExp ? '▲' : '▽'}</span>
+                      <button onClick={()=>remove(tab, item.id)} style={{ background:'none', border:'none', cursor:'pointer', color:'#C8C8CC', fontSize:22, padding:'0 2px', lineHeight:1, minWidth:32, minHeight:32, display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
+                    </div>
+                    {isExp && (
+                      <div style={{ background:'#F4F1EC', border:`1px solid ${T.border}`, borderTop:'none', borderRadius:'0 0 16px 16px', padding:'14px 16px' }}>
+                        <input
+                          value={editText}
+                          onChange={e=>setEditText(e.target.value)}
+                          style={{ width:'100%', border:`1px solid ${T.border}`, borderRadius:10, padding:'10px 14px', fontSize:15, fontFamily:'inherit', outline:'none', background:'#fff', color:T.ink, marginBottom:10 }}
+                        />
+                        <p style={{ fontSize:12, fontWeight:700, color:T.dim, marginBottom:6 }}>Due date (optional)</p>
+                        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+                          <input type="date"
+                            value={editDate}
+                            onChange={e=>setEditDate(e.target.value)}
+                            style={{ border:`1px solid ${T.border}`, borderRadius:10, padding:'9px 14px', fontSize:14, fontFamily:'inherit', outline:'none', background:'#fff', color:T.ink }}
+                          />
+                          {editDate && <button onClick={()=>setEditDate('')} style={{ background:'none', border:'none', cursor:'pointer', color:T.dim, fontSize:13 }}>✕ Clear</button>}
+                        </div>
+                        <div style={{ display:'flex', gap:8 }}>
+                          <button onClick={()=>saveTodo(tab, item.id)} style={{ background:T.green, color:'#fff', border:'none', borderRadius:10, padding:'10px 20px', fontSize:14, fontWeight:700, cursor:'pointer' }}>Save</button>
+                          <button onClick={()=>setExpandedId(null)} style={{ background:'none', border:`1px solid ${T.border}`, borderRadius:10, padding:'10px 16px', fontSize:14, cursor:'pointer', color:T.dim }}>Cancel</button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <p onClick={()=>toggle(tab, item.id)} style={{ flex:1, fontSize:16, color: item.done ? T.dim : T.ink, textDecoration: item.done ? 'line-through' : 'none', lineHeight:1.4, cursor:'pointer' }}>{item.text}</p>
-                  <button onClick={()=>remove(tab, item.id)} style={{ background:'none', border:'none', cursor:'pointer', color:'#C8C8CC', fontSize:22, padding:'0 2px', lineHeight:1, minWidth:32, minHeight:32, display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -1304,13 +1356,32 @@ const OurListsScreen = ({ onGoHome }) => {
               ))}
               <p style={{ fontSize:13, fontWeight:800, letterSpacing:1, textTransform:'uppercase', color:T.dim, marginBottom:8, marginTop:20 }}>Notes</p>
               <p style={{ fontSize:13, color:T.dim, marginBottom:12, lineHeight:1.5 }}>Thoughts, tangents, things to remember — not necessarily actionable.</p>
-              {notesList.map((n, i) => (
-                <div key={n.id} style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'12px 0', borderBottom:`1px solid ${T.border}` }}>
-                  <span style={{ fontSize:14, color:T.dim, marginTop:2, flexShrink:0, width:20 }}>{i+1}.</span>
-                  <p style={{ flex:1, fontSize:15, color:T.ink, lineHeight:1.5 }}>{n.text}</p>
-                  <button onClick={()=>removeNote(n.id)} style={{ background:'none', border:'none', cursor:'pointer', color:'#C8C8CC', fontSize:20, padding:'0 4px', minWidth:32, minHeight:32 }}>×</button>
-                </div>
-              ))}
+              {notesList.map((n, i) => {
+                const isNoteExp = expandedNoteId === n.id;
+                return (
+                  <div key={n.id}>
+                    <div style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'12px 0', borderBottom: isNoteExp ? 'none' : `1px solid ${T.border}` }}>
+                      <span style={{ fontSize:14, color:T.dim, marginTop:2, flexShrink:0, width:20 }}>{i+1}.</span>
+                      <p onClick={()=>openNoteExpand(n)} style={{ flex:1, fontSize:15, color:T.ink, lineHeight:1.5, cursor:'pointer' }}>{n.text}</p>
+                      <button onClick={()=>removeNote(n.id)} style={{ background:'none', border:'none', cursor:'pointer', color:'#C8C8CC', fontSize:20, padding:'0 4px', minWidth:32, minHeight:32 }}>×</button>
+                    </div>
+                    {isNoteExp && (
+                      <div style={{ background:'#F4F1EC', border:`1px solid ${T.border}`, borderRadius:10, padding:'12px 14px', marginBottom:10 }}>
+                        <textarea
+                          value={editNoteText}
+                          onChange={e=>setEditNoteText(e.target.value)}
+                          rows={3}
+                          style={{ width:'100%', border:`1px solid ${T.border}`, borderRadius:8, padding:'10px 12px', fontSize:14, fontFamily:'inherit', outline:'none', background:'#fff', color:T.ink, resize:'none', lineHeight:1.5 }}
+                        />
+                        <div style={{ display:'flex', gap:8, marginTop:10 }}>
+                          <button onClick={()=>saveNote(n.id)} style={{ background:T.amber, color:'#fff', border:'none', borderRadius:10, padding:'9px 18px', fontSize:14, fontWeight:700, cursor:'pointer' }}>Save</button>
+                          <button onClick={()=>setExpandedNoteId(null)} style={{ background:'none', border:`1px solid ${T.border}`, borderRadius:10, padding:'9px 14px', fontSize:14, cursor:'pointer', color:T.dim }}>Cancel</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -1353,21 +1424,60 @@ const OurListsScreen = ({ onGoHome }) => {
 
       {(tab==='chad' || tab==='joelle') && (
         <>
-          <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:16 }}>
+          <div style={{ display:'flex', flexDirection:'column', marginBottom:16 }}>
             {items[tab].length === 0 && <p style={{ color:T.dim, fontSize:14, textAlign:'center', padding:'32px 0' }}>No items yet — add one below</p>}
-            {items[tab].map(item => (
-              <div key={item.id} onClick={()=>toggle(tab, item.id)} style={{
-                display:'flex', alignItems:'center', gap:14, cursor:'pointer',
-                background: item.done ? T.greenBg : T.card, border:`1px solid ${item.done ? T.greenMid : T.border}`,
-                borderRadius:14, padding:'14px 18px', transition:'all .15s'
-              }}>
-                <div style={{ width:22, height:22, borderRadius:7, border:`2px solid ${item.done ? T.green : T.border}`, background: item.done ? T.green : 'transparent', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  {item.done && <span style={{ color:'#fff', fontSize:12, fontWeight:800 }}>✓</span>}
+            {sortTodos(items[tab]).map(item => {
+              const isExp = expandedId === item.id;
+              return (
+                <div key={item.id} style={{ marginBottom:8 }}>
+                  <div style={{
+                    display:'flex', alignItems:'center', gap:14,
+                    background: item.done ? T.greenBg : T.card,
+                    border:`1px solid ${item.done ? T.greenMid : T.border}`,
+                    borderRadius: isExp ? '14px 14px 0 0' : 14,
+                    padding:'14px 18px', transition:'background .15s'
+                  }}>
+                    <div onClick={()=>toggle(tab, item.id)} style={{ width:22, height:22, borderRadius:7, border:`2px solid ${item.done ? T.green : T.border}`, background: item.done ? T.green : 'transparent', flexShrink:0, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                      {item.done && <span style={{ color:'#fff', fontSize:12, fontWeight:800 }}>✓</span>}
+                    </div>
+                    <div onClick={()=>openExpand(item)} style={{ flex:1, cursor:'pointer' }}>
+                      <p style={{ fontSize:15, color: item.done ? T.dim : T.ink, textDecoration: item.done ? 'line-through' : 'none', lineHeight:1.4 }}>{item.text}</p>
+                      {item.due_date && !item.done && (
+                        <p style={{ fontSize:12, color:T.amber, marginTop:2, fontWeight:600 }}>📅 {formatDueDate(item.due_date)}</p>
+                      )}
+                    </div>
+                    <span style={{ fontSize:10, color:T.dim, marginRight:4 }}>{isExp ? '▲' : '▽'}</span>
+                    <button onClick={e=>{e.stopPropagation(); remove(tab, item.id);}} style={{ background:'none', border:'none', cursor:'pointer', color:T.border, fontSize:18, padding:'0 4px' }}>×</button>
+                  </div>
+                  {isExp && (
+                    <div style={{ background:'#F4F1EC', border:`1px solid ${T.border}`, borderTop:'none', borderRadius:'0 0 14px 14px', padding:'14px 18px' }}>
+                      <input
+                        value={editText}
+                        onChange={e=>setEditText(e.target.value)}
+                        style={{ width:'100%', border:`1px solid ${T.border}`, borderRadius:10, padding:'10px 14px', fontSize:15, fontFamily:'inherit', outline:'none', background:'#fff', color:T.ink, marginBottom:10 }}
+                      />
+                      <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:12 }}>
+                        <div>
+                          <p style={{ fontSize:12, fontWeight:700, color:T.dim, marginBottom:4 }}>Due date (optional)</p>
+                          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                            <input type="date"
+                              value={editDate}
+                              onChange={e=>setEditDate(e.target.value)}
+                              style={{ border:`1px solid ${T.border}`, borderRadius:10, padding:'8px 12px', fontSize:14, fontFamily:'inherit', outline:'none', background:'#fff', color:T.ink }}
+                            />
+                            {editDate && <button onClick={()=>setEditDate('')} style={{ background:'none', border:'none', cursor:'pointer', color:T.dim, fontSize:13 }}>✕ Clear</button>}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display:'flex', gap:8 }}>
+                        <button onClick={()=>saveTodo(tab, item.id)} style={{ background:T.green, color:'#fff', border:'none', borderRadius:10, padding:'9px 20px', fontSize:14, fontWeight:700, cursor:'pointer' }}>Save</button>
+                        <button onClick={()=>setExpandedId(null)} style={{ background:'none', border:`1px solid ${T.border}`, borderRadius:10, padding:'9px 16px', fontSize:14, cursor:'pointer', color:T.dim }}>Cancel</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <p style={{ flex:1, fontSize:15, color: item.done ? T.dim : T.ink, textDecoration: item.done ? 'line-through' : 'none', lineHeight:1.4 }}>{item.text}</p>
-                <button onClick={e=>{e.stopPropagation(); remove(tab, item.id);}} style={{ background:'none', border:'none', cursor:'pointer', color:T.border, fontSize:18, padding:'0 4px' }}>×</button>
-              </div>
-            ))}
+              );
+            })}
           </div>
           <div style={{ display:'flex', gap:10 }}>
             <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&add()}
@@ -1420,14 +1530,33 @@ const OurListsScreen = ({ onGoHome }) => {
           <div>
             <p style={{ fontSize:12, fontWeight:800, letterSpacing:1, textTransform:'uppercase', color:T.dim, marginBottom:8 }}>Session Notes</p>
             <p style={{ fontSize:13, color:T.dim, marginBottom:12 }}>Thoughts, tangents, things to remember — doesn't have to be budget-related.</p>
-            <div style={{ display:'flex', flexDirection:'column', gap:0 }}>
-              {notesList.map((n, i) => (
-                <div key={n.id} style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'10px 0', borderBottom:`1px solid ${T.border}` }}>
-                  <span style={{ fontSize:13, color:T.dim, marginTop:2, width:20 }}>{i+1}.</span>
-                  <p style={{ flex:1, fontSize:14, color:T.ink, lineHeight:1.5 }}>{n.text}</p>
-                  <button onClick={()=>removeNote(n.id)} style={{ background:'none', border:'none', cursor:'pointer', color:T.border, fontSize:18, padding:'0 4px' }}>×</button>
-                </div>
-              ))}
+            <div style={{ display:'flex', flexDirection:'column' }}>
+              {notesList.map((n, i) => {
+                const isNoteExp = expandedNoteId === n.id;
+                return (
+                  <div key={n.id}>
+                    <div style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'10px 0', borderBottom: isNoteExp ? 'none' : `1px solid ${T.border}` }}>
+                      <span style={{ fontSize:13, color:T.dim, marginTop:2, width:20 }}>{i+1}.</span>
+                      <p onClick={()=>openNoteExpand(n)} style={{ flex:1, fontSize:14, color:T.ink, lineHeight:1.5, cursor:'pointer' }}>{n.text}</p>
+                      <button onClick={()=>removeNote(n.id)} style={{ background:'none', border:'none', cursor:'pointer', color:T.border, fontSize:18, padding:'0 4px' }}>×</button>
+                    </div>
+                    {isNoteExp && (
+                      <div style={{ background:'#F4F1EC', border:`1px solid ${T.border}`, borderTop:'none', borderRadius:'0 0 10px 10px', padding:'12px 14px', marginBottom:4 }}>
+                        <textarea
+                          value={editNoteText}
+                          onChange={e=>setEditNoteText(e.target.value)}
+                          rows={2}
+                          style={{ width:'100%', border:`1px solid ${T.border}`, borderRadius:8, padding:'8px 12px', fontSize:14, fontFamily:'inherit', outline:'none', background:'#fff', color:T.ink, resize:'none', lineHeight:1.5 }}
+                        />
+                        <div style={{ display:'flex', gap:8, marginTop:8 }}>
+                          <button onClick={()=>saveNote(n.id)} style={{ background:T.amber, color:'#fff', border:'none', borderRadius:8, padding:'8px 16px', fontSize:13, fontWeight:700, cursor:'pointer' }}>Save</button>
+                          <button onClick={()=>setExpandedNoteId(null)} style={{ background:'none', border:`1px solid ${T.border}`, borderRadius:8, padding:'8px 12px', fontSize:13, cursor:'pointer', color:T.dim }}>Cancel</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
             <div style={{ display:'flex', gap:10, marginTop:14 }}>
               <input value={noteInput} onChange={e=>setNoteInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addNote()}
@@ -1827,15 +1956,16 @@ const PrepMode = ({ onExit }) => {
 
 // ─── APP SHELL ────────────────────────────────────────────────────────────────
 const SCREENS = [
-  { id:'welcome',   label:'Home',            comp: null },
-  { id:'picture',   label:'Big Picture',     comp: BigPicture },
-  { id:'cashflow',  label:'Cash Flow',       comp: CashFlow },
-  { id:'spending',  label:'Spending',        comp: Spending },
-  { id:'debt',      label:'Debt',            comp: Debt },
-  { id:'goals',     label:'Goals',           comp: Goals },
-  { id:'decisions', label:'Big Decisions',   comp: BigDecisions },
-  { id:'upcoming',  label:'Upcoming Changes',comp: UpcomingChanges },
-  { id:'ourlist',   label:'Our Lists',       comp: OurListsScreen },
+  { id:'welcome',     label:'Home',            comp: null },
+  { id:'lastsession', label:'Last Session',    comp: LastSession },
+  { id:'picture',     label:'Big Picture',     comp: BigPicture },
+  { id:'cashflow',    label:'Cash Flow',       comp: CashFlow },
+  { id:'spending',    label:'Spending',        comp: Spending },
+  { id:'debt',        label:'Debt',            comp: Debt },
+  { id:'goals',       label:'Goals',           comp: Goals },
+  { id:'decisions',   label:'Big Decisions',   comp: BigDecisions },
+  { id:'upcoming',    label:'Upcoming Changes',comp: UpcomingChanges },
+  { id:'ourlist',     label:'Our Lists',       comp: OurListsScreen },
 ];
 
 const HASH_ALIASES = { lists: 'ourlist' };
