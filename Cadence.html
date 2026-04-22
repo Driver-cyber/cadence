@@ -27,6 +27,17 @@
     .hover-lift { transition: box-shadow 0.15s, transform 0.15s; }
     .hover-lift:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); transform: translateY(-1px); }
     .check-btn:hover { opacity: 0.85; }
+    @keyframes cb-pop {
+      0%   { transform: scale(1); }
+      55%  { transform: scale(1.28); }
+      80%  { transform: scale(0.91); }
+      100% { transform: scale(1); }
+    }
+    @keyframes cb-draw { to { stroke-dashoffset: 0; } }
+    @keyframes cb-burst {
+      0%   { opacity: 1; transform: translate(0, 0) scale(1); }
+      100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(0.2); }
+    }
   </style>
 </head>
 <body>
@@ -463,6 +474,61 @@ const SectionHeader = ({ tag, tagColor, title, sub }) => (
     {sub && <p style={{ color: T.dim, fontSize: 15 }}>{sub}</p>}
   </div>
 );
+
+// ─── ANIMATED CHECKBOX ───────────────────────────────────────────────────────
+const CheckBox = ({ checked, onChange, size = 26 }) => {
+  const [burst, setBurst] = useState(false);
+  const handleClick = () => {
+    if (!checked) { setBurst(true); setTimeout(() => setBurst(false), 700); }
+    onChange();
+  };
+  // 6 particles in Cadence palette colors
+  const dots = [
+    { tx:'0px',   ty:'-19px', c:'#2A8B68' },
+    { tx:'14px',  ty:'-13px', c:'#C07A12' },
+    { tx:'19px',  ty:'2px',   c:'#6B5EA8' },
+    { tx:'13px',  ty:'15px',  c:'#2A8B68' },
+    { tx:'-15px', ty:'11px',  c:'#C07A12' },
+    { tx:'-19px', ty:'-4px',  c:'#6B5EA8' },
+  ];
+  return (
+    <div onClick={handleClick} style={{ position:'relative', width:size, height:size, cursor:'pointer', flexShrink:0, userSelect:'none', WebkitUserSelect:'none' }}>
+      <svg width={size} height={size} viewBox="0 0 28 28" style={{ display:'block', overflow:'visible' }}>
+        <rect x="1.5" y="1.5" width="25" height="25" rx="8"
+          fill={checked ? '#2A8B68' : 'transparent'}
+          stroke={checked ? '#2A8B68' : '#C8C8CC'}
+          strokeWidth="2.5"
+          style={{
+            transformBox:'fill-box', transformOrigin:'center',
+            animation: burst ? 'cb-pop 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards' : 'none',
+            transition: burst ? 'none' : 'fill 0.15s, stroke 0.15s',
+          }}
+        />
+        {checked && (
+          <path key={burst ? 'b' : 's'}
+            d="M7 14.5 L11.5 19 L21 9.5"
+            fill="none" stroke="white" strokeWidth="2.5"
+            strokeLinecap="round" strokeLinejoin="round"
+            strokeDasharray="22"
+            style={{
+              strokeDashoffset: burst ? 22 : 0,
+              animation: burst ? 'cb-draw 0.3s ease 0.1s forwards' : 'none',
+            }}
+          />
+        )}
+      </svg>
+      {burst && dots.map((d, i) => (
+        <div key={i} style={{
+          position:'absolute', top:'50%', left:'50%',
+          width:5, height:5, borderRadius:'50%', background:d.c,
+          marginTop:-2.5, marginLeft:-2.5, pointerEvents:'none',
+          '--tx': d.tx, '--ty': d.ty,
+          animation:`cb-burst 0.6s ease ${i * 30}ms forwards`,
+        }} />
+      ))}
+    </div>
+  );
+};
 
 // ─── SCREEN 0: WELCOME ────────────────────────────────────────────────────────
 const Welcome = ({ onStart, onPrep }) => (
@@ -1283,13 +1349,7 @@ const OurListsScreen = ({ onGoHome }) => {
                       borderRadius: isExp ? '16px 16px 0 0' : 16,
                       padding:'14px 16px', minHeight:56, transition:'background .15s'
                     }}>
-                      <div onClick={()=>toggle(tab, item.id)} style={{
-                        width:28, height:28, borderRadius:9, border:`2.5px solid ${item.done ? T.green : '#C8C8CC'}`,
-                        background: item.done ? T.green : 'transparent', flexShrink:0, cursor:'pointer',
-                        display:'flex', alignItems:'center', justifyContent:'center', transition:'all .15s'
-                      }}>
-                        {item.done && <span style={{ color:'#fff', fontSize:14, fontWeight:800, lineHeight:1 }}>✓</span>}
-                      </div>
+                      <CheckBox checked={item.done} onChange={()=>toggle(tab, item.id)} size={28} />
                       <div onClick={()=>openExpand(item)} style={{ flex:1, cursor:'pointer' }}>
                         <p style={{ fontSize:16, color: item.done ? T.dim : T.ink, textDecoration: item.done ? 'line-through' : 'none', lineHeight:1.4 }}>{item.text}</p>
                         {item.due_date && !item.done && (
@@ -1457,9 +1517,7 @@ const OurListsScreen = ({ onGoHome }) => {
                     borderRadius: isExp ? '14px 14px 0 0' : 14,
                     padding:'14px 18px', transition:'background .15s'
                   }}>
-                    <div onClick={()=>toggle(tab, item.id)} style={{ width:22, height:22, borderRadius:7, border:`2px solid ${item.done ? T.green : T.border}`, background: item.done ? T.green : 'transparent', flexShrink:0, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                      {item.done && <span style={{ color:'#fff', fontSize:12, fontWeight:800 }}>✓</span>}
-                    </div>
+                    <CheckBox checked={item.done} onChange={()=>toggle(tab, item.id)} size={22} />
                     <div onClick={()=>openExpand(item)} style={{ flex:1, cursor:'pointer' }}>
                       <p style={{ fontSize:15, color: item.done ? T.dim : T.ink, textDecoration: item.done ? 'line-through' : 'none', lineHeight:1.4 }}>{item.text}</p>
                       {item.due_date && !item.done && (
@@ -2263,9 +2321,7 @@ const OurList = () => {
                 {items[tab].length === 0 && <p style={{ fontSize:13, color:T.dim, textAlign:'center', padding:'20px 0' }}>No items yet — add one below</p>}
                 {items[tab].map(item => (
                   <div key={item.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 4px', borderBottom:`1px solid ${T.border}` }}>
-                    <div onClick={()=>toggle(tab, item.id)} style={{ width:20, height:20, borderRadius:6, border:`2px solid ${item.done ? T.green : T.border}`, background: item.done ? T.green : 'transparent', flexShrink:0, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                      {item.done && <span style={{ color:'#fff', fontSize:11, fontWeight:800 }}>✓</span>}
-                    </div>
+                    <CheckBox checked={item.done} onChange={()=>toggle(tab, item.id)} size={20} />
                     <p style={{ flex:1, fontSize:13, color: item.done ? T.dim : T.ink, textDecoration: item.done ? 'line-through' : 'none', lineHeight:1.4 }}>{item.text}</p>
                     <button onClick={()=>remove(tab, item.id)} style={{ background:'none', border:'none', cursor:'pointer', color:T.border, fontSize:16, padding:'0 2px', lineHeight:1 }}>×</button>
                   </div>
