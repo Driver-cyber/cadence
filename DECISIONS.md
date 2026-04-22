@@ -8,7 +8,7 @@
 
 ## 🎯 Current State
 
-**App status:** Feature-complete v1. Phase 1 (Supabase migration) complete, hardened, and live on `main`. Hash routing live — `/#lists` is Joelle's bookmark. April 20 session imported and rolled forward. 5 Phase 1 data integrity issues fixed and merged.
+**App status:** Feature-complete v1. Phase 1 (Supabase migration) complete, hardened, and live on `main`. PWA-ready: favicon, icons, manifest, and home-screen shortcut all set. Our Lists mobile UX polished. Supabase CDN resilience hardened for Safari standalone mode.
 
 **Current phase:** Phase 2 planning — scope decision is the first task next session.
 
@@ -40,6 +40,12 @@
 | 2026-04-21 | Hash-based routing for direct screen links | `/#lists` (alias for `/#ourlist`) is Joelle's bookmark. Every screen linkable by id. No server config needed — pure client-side. `go()` updates hash; `hashchange` listener keeps back/forward working. |
 | 2026-04-21 | Import flow accepts plain `--- Chad ---` / `[ ]` format | Parser handles both app export format and manual plain-text lists. Confirmed working with April 20 session RTF content. |
 | 2026-04-21 | Phase 1 hardened — 5 data integrity fixes | PrepMode re-fetches todos on mount (no stale Last Session tab). Save button has double-click guard + try/catch. All fire-and-forget db writes log errors via `.then()`. `addTodo`/`addNote` show inline error on failure. `saveUpcomingNote` debounced 400ms. FloatingBubble shows "Syncing…" instead of stale count while re-fetching on open. |
+| 2026-04-22 | PWA home-screen icons + favicon shipped | `favicon.svg` (Option E: geometric C ring + amber period dot), `apple-touch-icon.png`, `icon-192.png`, `icon-512.png`, `site.webmanifest`. App installable from Safari "Add to Home Screen". |
+| 2026-04-22 | `start_url: "/#lists"` in manifest | Joelle's home-screen icon launches directly to Our Lists. After any manifest change, delete old icon and re-add from Safari. |
+| 2026-04-22 | Supabase CDN switched to `unpkg.com` | All CDN scripts (React, Babel, Supabase) now on the same origin. Avoids Safari Privacy Protection selectively blocking `cdn.jsdelivr.net` in standalone PWA mode. |
+| 2026-04-22 | Supabase offline resilience — `sb` null guard | `sb` created with optional chaining; if CDN blocked, `sb = null` and script continues. All `db` methods guard `if (!sb)`: init returns early (DEFAULT_D + empty todos), writes are no-ops, reads return INIT defaults. App is fully usable even when Supabase is unavailable. 8-second fallback timeout also added to App init. |
+| 2026-04-22 | OurListsScreen home button uses `onGoHome` prop | Was setting `window.location.hash` directly (unreliable in iOS Safari standalone). Now App passes `onGoHome={() => go(0)}` as a prop — calls React state and hash atomically, same as the desktop nav button. |
+| 2026-04-22 | Our Lists tab bar: counts removed from tab buttons | `(done/total)` badges inside tab buttons made them too wide on narrow iPhones. Overall count is shown in the header. Tabs now fit natively on all iPhone widths. |
 
 ---
 
@@ -91,6 +97,8 @@
 ---
 
 ## 📝 Change Log
+
+**[2026-04-22]** — PWA mobile hardening. Fixed blank screen in Safari standalone mode: Supabase CDN switched from `cdn.jsdelivr.net` to `unpkg.com`; `sb` creation now uses optional chaining so a blocked CDN no longer crashes the script; all `db` methods guard against `sb = null`. Added 8-second fallback so `db.init()` timeout doesn't leave app frozen. Fixed Our Lists home button to use `onGoHome` prop (was setting hash directly — unreliable in standalone). Tab bar counts removed from tab pills so all 4 tabs fit on any iPhone. `site.webmanifest` `start_url` changed to `/#lists` so Joelle's home-screen icon launches directly to lists.
 
 **[2026-04-21]** — Phase 1 hardened. 5 red-team fixes shipped and merged to main: PrepMode Last Session tab now re-fetches todos on mount; Save button has double-click guard (saving state + try/catch); all fire-and-forget db writes log errors; `addTodo`/`addNote` show inline "Failed to save" on failure; `saveUpcomingNote` debounced 400ms; FloatingBubble shows "Syncing…" instead of stale count while loading on open.
 
