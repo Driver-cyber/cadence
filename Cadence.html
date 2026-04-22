@@ -269,7 +269,7 @@ const db = {
         joelle: allTodos.filter(t => t.person === 'joelle').map(t => ({ id: t.id, text: t.text, done: t.done, due_date: t.due_date, created_at: t.created_at })),
       },
       priorities:    [0,1,2].map(i => pris.find(p => p.slot === i+1)?.text ?? ''),
-      notes:         (notesRes.data || []).map(n => ({ id: n.id, text: n.text })),
+      notes:         (notesRes.data || []).map(n => ({ id: n.id, text: n.text, due_date: n.due_date, created_at: n.created_at })),
       upcomingNotes: [1,2,3,4,5].map(i => uNotes.find(u => u.slot === i)?.text ?? ''),
     });
   },
@@ -318,9 +318,9 @@ const db = {
     sb.from('notes').delete().eq('id', id)
       .then(r => { if (r.error) console.error('deleteNote failed:', r.error); });
   },
-  updateNote(id, text) {
+  updateNote(id, text, dueDate) {
     if (!sb) return;
-    sb.from('notes').update({ text }).eq('id', id)
+    sb.from('notes').update({ text, due_date: dueDate || null }).eq('id', id)
       .then(r => { if (r.error) console.error('updateNote failed:', r.error); });
   },
 
@@ -374,7 +374,7 @@ const db = {
   async loadNotes() {
     if (!sb) return INIT.notes;
     const { data } = await sb.from('notes').select('*').eq('session_id', currentSessionId).order('sort_order');
-    return (data || []).map(n => ({ id: n.id, text: n.text }));
+    return (data || []).map(n => ({ id: n.id, text: n.text, due_date: n.due_date, created_at: n.created_at }));
   },
   async loadLastSession() {
     if (!sb) return null;
@@ -407,6 +407,12 @@ const sortTodos = (arr) => {
   const noDate   = arr.filter(i => !i.done && !i.due_date).sort((a, b) => ts(a) - ts(b));
   const done     = arr.filter(i => i.done).sort((a, b) => ts(a) - ts(b));
   return [...withDate, ...noDate, ...done];
+};
+const sortNotes = (arr) => {
+  const ts = s => s.created_at ? new Date(s.created_at).getTime() : 0;
+  const withDate = arr.filter(n => n.due_date).sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
+  const noDate   = arr.filter(n => !n.due_date).sort((a, b) => ts(a) - ts(b));
+  return [...withDate, ...noDate];
 };
 const formatDueDate = (dateStr) => {
   if (!dateStr) return '';
@@ -1138,6 +1144,7 @@ const OurListsScreen = ({ onGoHome }) => {
   const [editDate, setEditDate] = useState('');
   const [expandedNoteId, setExpandedNoteId] = useState(null);
   const [editNoteText, setEditNoteText] = useState('');
+  const [editNoteDate, setEditNoteDate] = useState('');
 
   const openExpand = (item) => {
     if (expandedId === item.id) { setExpandedId(null); return; }
@@ -1156,12 +1163,13 @@ const OurListsScreen = ({ onGoHome }) => {
     if (expandedNoteId === n.id) { setExpandedNoteId(null); return; }
     setExpandedNoteId(n.id);
     setEditNoteText(n.text);
+    setEditNoteDate(n.due_date || '');
   };
   const saveNote = (id) => {
     const newText = editNoteText.trim();
     if (!newText) return;
-    setNotesList(prev => prev.map(n => n.id === id ? { ...n, text: newText } : n));
-    db.updateNote(id, newText);
+    setNotesList(prev => prev.map(n => n.id === id ? { ...n, text: newText, due_date: editNoteDate || null } : n));
+    db.updateNote(id, newText, editNoteDate || null);
     setExpandedNoteId(null);
   };
 
@@ -1356,13 +1364,16 @@ const OurListsScreen = ({ onGoHome }) => {
               ))}
               <p style={{ fontSize:13, fontWeight:800, letterSpacing:1, textTransform:'uppercase', color:T.dim, marginBottom:8, marginTop:20 }}>Notes</p>
               <p style={{ fontSize:13, color:T.dim, marginBottom:12, lineHeight:1.5 }}>Thoughts, tangents, things to remember — not necessarily actionable.</p>
-              {notesList.map((n, i) => {
+              {sortNotes(notesList).map((n, i) => {
                 const isNoteExp = expandedNoteId === n.id;
                 return (
                   <div key={n.id}>
                     <div style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'12px 0', borderBottom: isNoteExp ? 'none' : `1px solid ${T.border}` }}>
                       <span style={{ fontSize:14, color:T.dim, marginTop:2, flexShrink:0, width:20 }}>{i+1}.</span>
-                      <p onClick={()=>openNoteExpand(n)} style={{ flex:1, fontSize:15, color:T.ink, lineHeight:1.5, cursor:'pointer' }}>{n.text}</p>
+                      <div onClick={()=>openNoteExpand(n)} style={{ flex:1, cursor:'pointer' }}>
+                        <p style={{ fontSize:15, color:T.ink, lineHeight:1.5 }}>{n.text}</p>
+                        {n.due_date && <p style={{ fontSize:12, color:T.amber, marginTop:2, fontWeight:600 }}>📅 {formatDueDate(n.due_date)}</p>}
+                      </div>
                       <button onClick={()=>removeNote(n.id)} style={{ background:'none', border:'none', cursor:'pointer', color:'#C8C8CC', fontSize:20, padding:'0 4px', minWidth:32, minHeight:32 }}>×</button>
                     </div>
                     {isNoteExp && (
@@ -1371,9 +1382,18 @@ const OurListsScreen = ({ onGoHome }) => {
                           value={editNoteText}
                           onChange={e=>setEditNoteText(e.target.value)}
                           rows={3}
-                          style={{ width:'100%', border:`1px solid ${T.border}`, borderRadius:8, padding:'10px 12px', fontSize:14, fontFamily:'inherit', outline:'none', background:'#fff', color:T.ink, resize:'none', lineHeight:1.5 }}
+                          style={{ width:'100%', border:`1px solid ${T.border}`, borderRadius:8, padding:'10px 12px', fontSize:14, fontFamily:'inherit', outline:'none', background:'#fff', color:T.ink, resize:'none', lineHeight:1.5, marginBottom:10 }}
                         />
-                        <div style={{ display:'flex', gap:8, marginTop:10 }}>
+                        <p style={{ fontSize:12, fontWeight:700, color:T.dim, marginBottom:6 }}>Due date (optional)</p>
+                        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+                          <input type="date"
+                            value={editNoteDate}
+                            onChange={e=>setEditNoteDate(e.target.value)}
+                            style={{ border:`1px solid ${T.border}`, borderRadius:10, padding:'9px 14px', fontSize:14, fontFamily:'inherit', outline:'none', background:'#fff', color:T.ink }}
+                          />
+                          {editNoteDate && <button onClick={()=>setEditNoteDate('')} style={{ background:'none', border:'none', cursor:'pointer', color:T.dim, fontSize:13 }}>✕ Clear</button>}
+                        </div>
+                        <div style={{ display:'flex', gap:8 }}>
                           <button onClick={()=>saveNote(n.id)} style={{ background:T.amber, color:'#fff', border:'none', borderRadius:10, padding:'9px 18px', fontSize:14, fontWeight:700, cursor:'pointer' }}>Save</button>
                           <button onClick={()=>setExpandedNoteId(null)} style={{ background:'none', border:`1px solid ${T.border}`, borderRadius:10, padding:'9px 14px', fontSize:14, cursor:'pointer', color:T.dim }}>Cancel</button>
                         </div>
@@ -1531,13 +1551,16 @@ const OurListsScreen = ({ onGoHome }) => {
             <p style={{ fontSize:12, fontWeight:800, letterSpacing:1, textTransform:'uppercase', color:T.dim, marginBottom:8 }}>Session Notes</p>
             <p style={{ fontSize:13, color:T.dim, marginBottom:12 }}>Thoughts, tangents, things to remember — doesn't have to be budget-related.</p>
             <div style={{ display:'flex', flexDirection:'column' }}>
-              {notesList.map((n, i) => {
+              {sortNotes(notesList).map((n, i) => {
                 const isNoteExp = expandedNoteId === n.id;
                 return (
                   <div key={n.id}>
                     <div style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'10px 0', borderBottom: isNoteExp ? 'none' : `1px solid ${T.border}` }}>
                       <span style={{ fontSize:13, color:T.dim, marginTop:2, width:20 }}>{i+1}.</span>
-                      <p onClick={()=>openNoteExpand(n)} style={{ flex:1, fontSize:14, color:T.ink, lineHeight:1.5, cursor:'pointer' }}>{n.text}</p>
+                      <div onClick={()=>openNoteExpand(n)} style={{ flex:1, cursor:'pointer' }}>
+                        <p style={{ fontSize:14, color:T.ink, lineHeight:1.5 }}>{n.text}</p>
+                        {n.due_date && <p style={{ fontSize:12, color:T.amber, marginTop:2, fontWeight:600 }}>📅 {formatDueDate(n.due_date)}</p>}
+                      </div>
                       <button onClick={()=>removeNote(n.id)} style={{ background:'none', border:'none', cursor:'pointer', color:T.border, fontSize:18, padding:'0 4px' }}>×</button>
                     </div>
                     {isNoteExp && (
@@ -1546,9 +1569,22 @@ const OurListsScreen = ({ onGoHome }) => {
                           value={editNoteText}
                           onChange={e=>setEditNoteText(e.target.value)}
                           rows={2}
-                          style={{ width:'100%', border:`1px solid ${T.border}`, borderRadius:8, padding:'8px 12px', fontSize:14, fontFamily:'inherit', outline:'none', background:'#fff', color:T.ink, resize:'none', lineHeight:1.5 }}
+                          style={{ width:'100%', border:`1px solid ${T.border}`, borderRadius:8, padding:'8px 12px', fontSize:14, fontFamily:'inherit', outline:'none', background:'#fff', color:T.ink, resize:'none', lineHeight:1.5, marginBottom:10 }}
                         />
-                        <div style={{ display:'flex', gap:8, marginTop:8 }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:10 }}>
+                          <div>
+                            <p style={{ fontSize:12, fontWeight:700, color:T.dim, marginBottom:4 }}>Due date (optional)</p>
+                            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                              <input type="date"
+                                value={editNoteDate}
+                                onChange={e=>setEditNoteDate(e.target.value)}
+                                style={{ border:`1px solid ${T.border}`, borderRadius:8, padding:'7px 10px', fontSize:13, fontFamily:'inherit', outline:'none', background:'#fff', color:T.ink }}
+                              />
+                              {editNoteDate && <button onClick={()=>setEditNoteDate('')} style={{ background:'none', border:'none', cursor:'pointer', color:T.dim, fontSize:12 }}>✕ Clear</button>}
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ display:'flex', gap:8 }}>
                           <button onClick={()=>saveNote(n.id)} style={{ background:T.amber, color:'#fff', border:'none', borderRadius:8, padding:'8px 16px', fontSize:13, fontWeight:700, cursor:'pointer' }}>Save</button>
                           <button onClick={()=>setExpandedNoteId(null)} style={{ background:'none', border:`1px solid ${T.border}`, borderRadius:8, padding:'8px 12px', fontSize:13, cursor:'pointer', color:T.dim }}>Cancel</button>
                         </div>
