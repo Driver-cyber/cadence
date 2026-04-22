@@ -16,7 +16,7 @@
   <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body, #root { height: 100%; font-family: 'Outfit', sans-serif; background: #FAF7F2; color: #1C1C1E; }
@@ -208,7 +208,8 @@ const DEFAULT_D = {
 // ─── SUPABASE ─────────────────────────────────────────────────────────────────
 const SUPABASE_URL     = 'https://pwxtcdutncsbnffvaszh.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable__l5FPA2OKH-sPI0TP0E4Xg_HxpGr9ni';
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const sb = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) ?? null;
+if (!sb) console.warn('Supabase unavailable — app running in offline mode with default data');
 const FAMILY_ID = 'stewarts';
 let currentSessionId = null;
 
@@ -234,6 +235,7 @@ const mergeD = (saved) => {
 
 const db = {
   async init() {
+    if (!sb) return;
     // Find open session or create one
     const { data: sessions } = await sb.from('sessions')
       .select().eq('family_id', FAMILY_ID).is('completed_at', null)
@@ -273,6 +275,7 @@ const db = {
   },
 
   async addTodo(person, text, sortOrder) {
+    if (!sb) throw new Error('offline');
     const { data } = await sb.from('todos').insert({
       family_id: FAMILY_ID, session_id: currentSessionId,
       person, text, done: false, sort_order: sortOrder,
@@ -280,15 +283,18 @@ const db = {
     return data;
   },
   toggleTodo(id, done) {
+    if (!sb) return;
     sb.from('todos').update({ done, updated_at: new Date().toISOString() }).eq('id', id)
       .then(r => { if (r.error) console.error('toggleTodo failed:', r.error); });
   },
   deleteTodo(id) {
+    if (!sb) return;
     sb.from('todos').delete().eq('id', id)
       .then(r => { if (r.error) console.error('deleteTodo failed:', r.error); });
   },
 
   savePriority(slot, text) {
+    if (!sb) return;
     sb.from('priorities').upsert(
       { family_id: FAMILY_ID, session_id: currentSessionId, slot, text, updated_at: new Date().toISOString() },
       { onConflict: 'session_id,slot' }
@@ -296,17 +302,20 @@ const db = {
   },
 
   async addNote(text, sortOrder) {
+    if (!sb) throw new Error('offline');
     const { data } = await sb.from('notes').insert({
       family_id: FAMILY_ID, session_id: currentSessionId, text, sort_order: sortOrder,
     }).select().single();
     return data;
   },
   deleteNote(id) {
+    if (!sb) return;
     sb.from('notes').delete().eq('id', id)
       .then(r => { if (r.error) console.error('deleteNote failed:', r.error); });
   },
 
   saveUpcomingNote(slot, text) {
+    if (!sb) return;
     sb.from('upcoming_notes').upsert(
       { family_id: FAMILY_ID, slot, text, updated_at: new Date().toISOString() },
       { onConflict: 'family_id,slot' }
@@ -314,6 +323,7 @@ const db = {
   },
 
   async saveBudgetData(data) {
+    if (!sb) return;
     await sb.from('budget_data').upsert(
       { family_id: FAMILY_ID, data, updated_at: new Date().toISOString(), updated_by: 'chad' },
       { onConflict: 'family_id' }
@@ -321,6 +331,7 @@ const db = {
   },
 
   async newSession(rolledTodos) {
+    if (!sb) return;
     await sb.from('sessions').update({ completed_at: new Date().toISOString() }).eq('id', currentSessionId);
     const { data } = await sb.from('sessions')
       .insert({ family_id: FAMILY_ID, session_date: new Date().toISOString().split('T')[0] })
@@ -337,6 +348,7 @@ const db = {
   },
 
   async loadTodos() {
+    if (!sb) return INIT.todos;
     const { data } = await sb.from('todos').select('*').eq('session_id', currentSessionId).order('sort_order');
     const rows = data || [];
     return {
@@ -345,10 +357,12 @@ const db = {
     };
   },
   async loadPriorities() {
+    if (!sb) return INIT.priorities;
     const { data } = await sb.from('priorities').select('*').eq('session_id', currentSessionId).order('slot');
     return [0,1,2].map(i => data?.find(p => p.slot === i+1)?.text ?? '');
   },
   async loadNotes() {
+    if (!sb) return INIT.notes;
     const { data } = await sb.from('notes').select('*').eq('session_id', currentSessionId).order('sort_order');
     return (data || []).map(n => ({ id: n.id, text: n.text }));
   },

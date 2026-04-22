@@ -2,7 +2,7 @@
   "name": "Cadence",
   "short_name": "Cadence",
   "description": "Stewart Family Finance & Lists",
-  "start_url": "/",
+  "start_url": "/#lists",
   "display": "standalone",
   "background_color": "#173528",
   "theme_color": "#2A8B68",
