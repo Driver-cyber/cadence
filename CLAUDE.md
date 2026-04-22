@@ -14,7 +14,7 @@
 
 **Ask before assuming:** If a request contradicts something in DECISIONS.md, surface it. "Are we pivoting?" is always the right question.
 
-**Token discipline:** Do not read files speculatively. Ask for the specific file if unsure. The app is ~2,100 lines — don't load it unless the task requires it.
+**Token discipline:** Do not read files speculatively. Ask for the specific file if unsure. The app is ~2,150 lines — don't load it unless the task requires it.
 
 ---
 
@@ -61,6 +61,11 @@
 ├── HANDOFF.md             # Project history and context (do not edit programmatically)
 ├── CLAUDE.md              # This file
 ├── DECISIONS.md           # Living decision log
+├── favicon.svg            # App icon (Option E: geometric C ring + amber period dot)
+├── apple-touch-icon.png   # iOS home screen icon (180×180)
+├── icon-192.png           # PWA icon
+├── icon-512.png           # PWA icon
+├── site.webmanifest       # PWA manifest — start_url: /#lists
 └── README.md              # (to be created)
 ```
 
@@ -160,7 +165,8 @@ Full schema in `SUPABASE_SCHEMA.sql`. RLS: anon key, `family_id = 'stewarts'`. R
 | Floating Bubble | ✅ | Persistent, synced, export |
 | Prep Mode | ✅ | 5-tab data editor, save & apply |
 | Import Flow | ✅ | Paste export, recap, roll forward |
-| Supabase client setup | ✅ | Phase 1 complete — all data in Supabase, `db` module live |
+| Supabase client setup | ✅ | Phase 1 complete. CDN on `unpkg.com`. `sb` guarded with optional chaining; all `db` methods handle `sb=null` for offline/blocked Safari. 8s init timeout. |
+| PWA / home screen | ✅ | `favicon.svg`, `apple-touch-icon.png`, `icon-192/512.png`, `site.webmanifest`. `start_url: /#lists`. After re-adding to home screen, app launches to Our Lists. |
 | Real-time todo sync | 🔜 | Subscribe to todos table — Phase 2 (next) |
 | Build step (env injection) | 🔜 | For Supabase keys via Cloudflare Pages |
 | Edit Mode (in-session) | 🔜 | Edit data during session, not just Prep Mode |
