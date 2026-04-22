@@ -1126,7 +1126,7 @@ const useIsMobile = () => {
 };
 
 // ─── OUR LISTS SCREEN (mobile-first, replaces familylists app) ───────────────
-const OurListsScreen = () => {
+const OurListsScreen = ({ onGoHome }) => {
   const mobile = useIsMobile();
   const [tab, setTab] = useState('chad');
   const [items, setItems] = useState(INIT.todos);
@@ -1200,7 +1200,7 @@ const OurListsScreen = () => {
         {/* Mobile Header */}
         <div style={{ background:'#fff', borderBottom:`1px solid ${T.border}`, padding:'16px 20px 0', flexShrink:0 }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-            <button onClick={() => { window.location.hash = 'welcome'; }} style={{ background:'none', border:'none', padding:0, cursor:'pointer', textAlign:'left' }}>
+            <button onClick={onGoHome} style={{ background:'none', border:'none', padding:0, cursor:'pointer', textAlign:'left' }}>
               <p style={{ fontWeight:800, fontSize:20 }}>💚 Cadence</p>
               <p style={{ fontSize:12, color:T.dim }}>{allDone}/{allTotal} items done</p>
             </button>
@@ -1209,15 +1209,14 @@ const OurListsScreen = () => {
             </div>
           </div>
           {/* Tabs */}
-          <div style={{ display:'flex', borderBottom:`1px solid ${T.border}`, marginLeft:-20, marginRight:-20, paddingLeft:20, paddingRight:20, overflowX:'auto', WebkitOverflowScrolling:'touch', scrollbarWidth:'none' }}>
+          <div style={{ display:'flex', borderBottom:`1px solid ${T.border}`, marginLeft:-20, marginRight:-20, paddingLeft:12 }}>
             {TABS.map(t => (
               <button key={t.id} onClick={()=>setTab(t.id)} style={{
-                background:'none', border:'none', padding:'10px 14px', fontSize:14, fontWeight:700,
+                background:'none', border:'none', padding:'10px 12px', fontSize:14, fontWeight:700,
                 color: tab===t.id ? T.ink : T.dim, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap',
                 borderBottom:`3px solid ${tab===t.id ? T.green : 'transparent'}`, transition:'color .15s'
               }}>
                 {t.label}
-                {t.count > 0 && <span style={{ marginLeft:5, fontSize:11, color: t.done===t.count ? T.green : T.dim }}>({t.done}/{t.count})</span>}
               </button>
             ))}
           </div>
@@ -1845,9 +1844,10 @@ const App = () => {
   const [prepMode, setPrepMode] = useState(false);
 
   useEffect(() => {
+    const fallback = setTimeout(() => setReady(true), 8000);
     db.init()
-      .then(() => setReady(true))
-      .catch(err => { console.error('Supabase init failed:', err); setReady(true); });
+      .then(() => { clearTimeout(fallback); setReady(true); })
+      .catch(err => { clearTimeout(fallback); console.error('Supabase init failed:', err); setReady(true); });
   }, []);
 
   useEffect(() => {
@@ -1896,7 +1896,7 @@ const App = () => {
       )}
 
       <div style={{ flex:1, overflowY:'auto' }}>
-        {isHome ? <Welcome onStart={()=>go(1)} onPrep={()=>setPrepMode(true)} /> : S.comp ? <S.comp /> : null}
+        {isHome ? <Welcome onStart={()=>go(1)} onPrep={()=>setPrepMode(true)} /> : S.comp ? <S.comp onGoHome={()=>go(0)} /> : null}
       </div>
 
       {!isHome && (
