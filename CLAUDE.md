@@ -10,11 +10,15 @@
 
 **Read first:** Always check `DECISIONS.md` before touching any code. It is the ground truth for current state, open questions, and what's decided.
 
+**Check the tracker:** Glance at `cadence-tracker.html` (the `tracker-data` JSON block) at session start to confirm which priorities are active. Update it whenever priorities shift.
+
 **Propose before you build:** For any change involving more than one area of the app, or any new feature, write a short plan and wait for explicit approval (`y`, `go`, or `looks good`) before writing code. No exceptions.
 
 **Ask before assuming:** If a request contradicts something in DECISIONS.md, surface it. "Are we pivoting?" is always the right question.
 
 **Token discipline:** Do not read files speculatively. Ask for the specific file if unsure. The app is ~2,150 lines — don't load it unless the task requires it.
+
+**Session-end protocol:** After any significant session, ask "Should I update DECISIONS.md and the tracker?" — update both before closing out.
 
 ---
 
@@ -61,6 +65,7 @@
 ├── HANDOFF.md             # Project history and context (do not edit programmatically)
 ├── CLAUDE.md              # This file
 ├── DECISIONS.md           # Living decision log
+├── cadence-tracker.html   # Build tracker — visual priority board + machine-readable JSON block
 ├── favicon.svg            # App icon (Option E: geometric C ring + amber period dot)
 ├── apple-touch-icon.png   # iOS home screen icon (180×180)
 ├── icon-192.png           # PWA icon
@@ -221,3 +226,4 @@ Full schema in `SUPABASE_SCHEMA.sql`. RLS: anon key, `family_id = 'stewarts'`. R
 - Multi-area change: propose a plan, wait for `y` or `go`.
 - Financial data changes: always go through Prep Mode pattern, never hardcode without noting in DECISIONS.md.
 - Supabase migration: do not touch localStorage keys without updating both the migration plan in DECISIONS.md and the schema in SUPABASE_SCHEMA.sql.
+- Build tracker: update the `tracker-data` JSON block in `cadence-tracker.html` whenever top-3 priorities change or a priority is completed. The JSON feeds the cross-project dashboard at project-dashboard-6a7.pages.dev — keep it accurate.
