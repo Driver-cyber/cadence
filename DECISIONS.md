@@ -8,11 +8,11 @@
 
 ## 🎯 Current State
 
-**App status:** Feature-complete v1. Phase 1 (Supabase migration) complete, hardened, and live on `main`. PWA-ready: favicon, icons, manifest, and home-screen shortcut all set. Our Lists mobile UX polished. Supabase CDN resilience hardened for Safari standalone mode. Todo/note editing with due dates shipped. Last Session accomplishment screen and animated checkboxes shipped on feature branch (pending merge).
+**App status:** Feature-complete v1. All session 2 work merged to `main` and live. Phase 1 (Supabase migration) complete. PWA-ready. Our Lists mobile UX polished. Todo/note editing with due dates, Last Session screen, animated checkboxes, and build tracker all shipped and deployed. Cross-project dashboard linked via `cadence-tracker.html` `columns` key (fixed 2026-04-23).
 
-**Current phase:** Phase 2 planning — scope decision is the first task next session. Merge current feature branch first.
+**Current phase:** Phase 2 planning — scope decision is the first task next session.
 
-**Immediate next task:** (1) Merge `claude/supabase-phase-1-u0RKn` → `main` to ship all session 2 work (todo/note editing, due dates, Last Session screen, animated checkboxes, build tracker). Then (2) Phase 2 brainstorm — decide real-time scope (todos only vs. all tables), and whether any other features (action items tab, session history stub) belong in Phase 2 before real-time work starts.
+**Immediate next task:** Phase 2 brainstorm — decide real-time sync scope (todos only vs. all tables), and whether any other features (action items tab, session history stub) belong in Phase 2 before real-time work starts. Scope decision unblocks all Phase 2 coding.
 
 ---
 
@@ -101,6 +101,8 @@
 ---
 
 ## 📝 Change Log
+
+**[2026-04-23]** — Session 3 close. All session 2 work confirmed merged to `main` (PRs #13–15). Fixed `cadence-tracker.html` missing `columns` key for cross-project dashboard link. Tracker priorities rotated: "Merge branch" removed (done), Phase 2 scope decision is now #1, real-time sync is #2, session history is #3. DECISIONS.md updated to reflect clean `main` state and Phase 2 as the active next task.
 
 **[2026-04-22]** — Build tracker added. `cadence-tracker.html` created as a founding doc — walnut/amber/wheat visual priority board with machine-readable JSON block feeding cross-project dashboard. CLAUDE.md updated with tracker check in Session Protocol and tracker maintenance rule. Initial top-3: (1) merge feature branch, (2) Phase 2 real-time sync, (3) session history UI. Todo/note editing with due dates, Last Session screen, and animated CheckBox component shipped on current feature branch.
 
