@@ -2048,6 +2048,71 @@ const PrepMode = ({ onExit }) => {
   );
 };
 
+// ─── PULL TO REFRESH ─────────────────────────────────────────────────────────
+const PullToRefresh = ({ children, screenId }) => {
+  const [pullDist, setPullDist] = React.useState(0);
+  const startY = React.useRef(null);
+  const distRef = React.useRef(0);
+  const divRef = React.useRef(null);
+  const THRESHOLD = 72;
+
+  React.useEffect(() => {
+    const el = divRef.current;
+    if (!el) return;
+    const onStart = (e) => {
+      if (el.scrollTop === 0) startY.current = e.touches[0].clientY;
+    };
+    const onMove = (e) => {
+      if (startY.current === null) return;
+      const dy = e.touches[0].clientY - startY.current;
+      if (dy > 0) {
+        const d = Math.min(dy, THRESHOLD + 28);
+        distRef.current = d;
+        setPullDist(d);
+        if (dy > 6) e.preventDefault();
+      } else {
+        startY.current = null;
+        distRef.current = 0;
+        setPullDist(0);
+      }
+    };
+    const onEnd = () => {
+      if (distRef.current >= THRESHOLD) window.location.reload();
+      startY.current = null;
+      distRef.current = 0;
+      setPullDist(0);
+    };
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchmove', onMove, { passive: false });
+    el.addEventListener('touchend', onEnd);
+    return () => {
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchmove', onMove);
+      el.removeEventListener('touchend', onEnd);
+    };
+  }, []);
+
+  const ready = pullDist >= THRESHOLD;
+  return (
+    <div ref={divRef} style={{ flex:1, overflowY:'auto', position:'relative' }}>
+      {pullDist > 0 && (
+        <div style={{
+          position:'absolute', top:0, left:0, right:0, height:pullDist,
+          display:'flex', alignItems:'center', justifyContent:'center',
+          background: T.cream, zIndex:50,
+          borderBottom:`1px solid ${ready ? T.green : T.border}`
+        }}>
+          <span style={{
+            fontSize:13, fontWeight:600, color: ready ? T.green : T.dim,
+            display:'inline-block', transform:`rotate(${ready ? 180 : 0}deg)`, transition:'transform .2s, color .2s'
+          }}>↓</span>
+        </div>
+      )}
+      {children}
+    </div>
+  );
+};
+
 // ─── APP SHELL ────────────────────────────────────────────────────────────────
 const SCREENS = [
   { id:'welcome',     label:'Home',            comp: null },
@@ -2133,9 +2198,9 @@ const App = () => {
         </nav>
       )}
 
-      <div style={{ flex:1, overflowY:'auto' }}>
+      <PullToRefresh key={S.id}>
         {isHome ? <Welcome onStart={()=>go(1)} onPrep={()=>setPrepMode(true)} /> : S.comp ? <S.comp onGoHome={()=>go(0)} /> : null}
-      </div>
+      </PullToRefresh>
 
       {!isHome && S.id !== 'ourlist' && (
         <footer style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 40px', borderTop:`1px solid ${T.border}`, background:'#FFF', flexShrink:0 }}>
