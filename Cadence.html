@@ -532,7 +532,7 @@ const CheckBox = ({ checked, onChange, size = 26 }) => {
 
 // ─── SCREEN 0: WELCOME ────────────────────────────────────────────────────────
 const Welcome = ({ onStart, onPrep }) => (
-  <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', textAlign:'center', padding: '40px 60px', gap: 24 }}>
+  <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'100dvh', textAlign:'center', padding: '40px 60px', gap: 24 }}>
     <div style={{ fontSize: 56 }}>💚</div>
     <div>
       <h1 style={{ fontFamily:"'Playfair Display', serif", fontSize: 54, fontWeight: 700, lineHeight: 1.08, marginBottom: 12 }}>
@@ -1299,7 +1299,7 @@ const OurListsScreen = ({ onGoHome }) => {
     const inputPerson = tab === 'chad' ? 'Chad' : 'Joelle';
 
     return (
-      <div style={{ display:'flex', flexDirection:'column', height:'100dvh', background:T.cream, overflow:'hidden', position:'fixed', inset:0 }}>
+      <div style={{ display:'flex', flexDirection:'column', height:'100dvh', background:T.cream, overflow:'hidden' }}>
         {/* Mobile Header */}
         <div style={{ background:'#fff', borderBottom:`1px solid ${T.border}`, padding:'16px 20px 0', flexShrink:0 }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
@@ -2118,7 +2118,7 @@ const App = () => {
 
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', background: T.cream, overflow:'hidden' }}>
-      {!isHome && (
+      {!isHome && S.id !== 'ourlist' && (
         <nav style={{ display:'flex', alignItems:'center', gap:4, padding:'10px 40px', borderBottom:`1px solid ${T.border}`, background:'#FFF', flexShrink:0, flexWrap:'wrap' }}>
           <button onClick={()=>go(0)} style={{ background:'none', border:'none', cursor:'pointer', color: T.dim, fontSize:13, fontWeight:600, padding:'4px 10px', borderRadius:100, marginRight:4 }}>💚 Cadence</button>
           <div style={{ width:1, height:16, background: T.border, marginRight:4 }} />
@@ -2137,7 +2137,7 @@ const App = () => {
         {isHome ? <Welcome onStart={()=>go(1)} onPrep={()=>setPrepMode(true)} /> : S.comp ? <S.comp onGoHome={()=>go(0)} /> : null}
       </div>
 
-      {!isHome && (
+      {!isHome && S.id !== 'ourlist' && (
         <footer style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 40px', borderTop:`1px solid ${T.border}`, background:'#FFF', flexShrink:0 }}>
           <button onClick={()=>go(idx-1)} disabled={idx<=1} style={{
             background:'none', border:`1px solid ${idx<=1 ? T.border : T.border}`, borderRadius:100,
