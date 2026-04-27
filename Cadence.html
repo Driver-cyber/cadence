@@ -2094,7 +2094,7 @@ const PullToRefresh = ({ children, screenId }) => {
 
   const ready = pullDist >= THRESHOLD;
   return (
-    <div ref={divRef} style={{ flex:1, overflowY:'auto', position:'relative' }}>
+    <div ref={divRef} data-scroll style={{ flex:1, overflowY:'auto', position:'relative' }}>
       {pullDist > 0 && (
         <div style={{
           position:'absolute', top:0, left:0, right:0, height:pullDist,
@@ -2162,6 +2162,18 @@ const App = () => {
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
+  // Force iOS Safari to repaint and reset scroll after every screen change.
+  // Without this, navigating screens leaves a blank cream screen (GPU layer
+  // not invalidated after position:fixed elements unmount).
+  useEffect(() => {
+    const el = document.querySelector('[data-scroll]');
+    if (!el) return;
+    el.scrollTop = 0;
+    el.style.webkitTransform = 'translateZ(0)';
+    const id = requestAnimationFrame(() => { el.style.webkitTransform = ''; });
+    return () => cancelAnimationFrame(id);
+  }, [idx]);
+
   const go = (n) => {
     const c = Math.max(0, Math.min(SCREENS.length-1, n));
     setIdx(c);
@@ -2198,7 +2210,7 @@ const App = () => {
         </nav>
       )}
 
-      <PullToRefresh key={S.id}>
+      <PullToRefresh>
         {isHome ? <Welcome onStart={()=>go(1)} onPrep={()=>setPrepMode(true)} /> : S.comp ? <S.comp onGoHome={()=>go(0)} /> : null}
       </PullToRefresh>
 
