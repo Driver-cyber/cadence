@@ -271,7 +271,7 @@
   {
     "project": "Cadence",
     "repo": "Driver-cyber/cadence",
-    "updated": "2026-04-23",
+    "updated": "2026-04-28",
     "phase": "Phase 2 Planning",
     "branch": "main",
     "deploy_url": "cadence.pages.dev",
@@ -284,6 +284,79 @@
             "desc": "Decide real-time sync scope: todos only (lowest risk, highest value) or add priorities + notes to the same subscription. Narrow scope is safer — can expand if stable.",
             "status": "planning",
             "statusLabel": "Decide first"
+          }
+        ],
+        "shipped": [
+          {
+            "date": "2026-04-27",
+            "what": "Fixed iOS Safari blank screen on home navigation using a one-frame webkitTransform repaint hack — no component remounting needed.",
+            "tags": ["ios", "mobile", "ux", "defensive-coding"],
+            "learned": "iOS Safari GPU layers don't auto-invalidate after position:fixed elements unmount — a translateZ(0) flush is the reliable fix."
+          },
+          {
+            "date": "2026-04-27",
+            "what": "Added pull-to-refresh gesture to the PWA — swipe down from any screen's top to reload and re-sync Supabase data.",
+            "tags": ["mobile", "ux", "ios"]
+          },
+          {
+            "date": "2026-04-27",
+            "what": "Removed position:fixed from Our Lists mobile layout — App shell now owns nav/footer visibility, normal flow throughout.",
+            "tags": ["mobile", "architecture", "css"],
+            "learned": "position:fixed overlays that cover nav/footer belong in the shell, not the child component."
+          },
+          {
+            "date": "2026-04-22",
+            "what": "Animated CheckBox shipped: 3-layer sequence — spring-pop border, SVG checkmark stroke draw, Cadence-palette particle burst.",
+            "tags": ["animation", "ux", "mobile"],
+            "learned": "Layer-by-layer CSS animation (pop → draw → burst) is more satisfying than a single unified transition."
+          },
+          {
+            "date": "2026-04-22",
+            "what": "Last Session screen added — shows completed todos from the previous closed session with a celebratory green banner.",
+            "tags": ["ux", "founding"],
+            "learned": "Celebrating past wins at session start sets a better tone than jumping straight into numbers."
+          },
+          {
+            "date": "2026-04-22",
+            "what": "Todo and note detail cards with optional due dates, tap-to-expand inline editing, and auto-sort (dated → undated → completed).",
+            "tags": ["ux", "mobile"]
+          },
+          {
+            "date": "2026-04-22",
+            "what": "PWA offline resilience: CDN switched to unpkg.com, sb=null guard on all db methods, 8s fallback so app works when Supabase is unreachable.",
+            "tags": ["defensive-coding", "mobile", "ios"],
+            "learned": "Safari standalone mode blocks cdn.jsdelivr.net under Privacy Protection — keep all CDN scripts on the same origin."
+          },
+          {
+            "date": "2026-04-22",
+            "what": "Favicon and PWA icons shipped: geometric C-ring + amber period dot (option E), apple-touch-icon, and site.webmanifest with start_url: /#lists.",
+            "tags": ["favicon", "branding", "mobile"]
+          },
+          {
+            "date": "2026-04-22",
+            "what": "Build tracker (cadence-tracker.html) created with machine-readable JSON block wired to the cross-project dashboard.",
+            "tags": ["founding", "docs"]
+          },
+          {
+            "date": "2026-04-21",
+            "what": "Phase 1 hardened: double-click guard on Save, fire-and-forget error logging, inline addTodo/addNote failure messages, saveUpcomingNote debounced 400ms.",
+            "tags": ["defensive-coding", "ux"]
+          },
+          {
+            "date": "2026-04-21",
+            "what": "Hash-based routing added — every screen linkable via #id, /#lists is Joelle's permanent bookmark for Our Lists.",
+            "tags": ["architecture", "mobile", "ux"]
+          },
+          {
+            "date": "2026-04-21",
+            "what": "Phase 1 complete: all localStorage replaced with Supabase — todos, priorities, notes, upcoming_notes, and budget_data persist cross-device.",
+            "tags": ["sync", "architecture", "founding"],
+            "learned": "Replacing storage calls incrementally (not a rewrite) kept the app fully working throughout the migration."
+          },
+          {
+            "date": "2026-04-21",
+            "what": "v1 shipped: 8-screen Money Date app with live budget data, family lists, Prep Mode, floating bubble, and session import/recap flow.",
+            "tags": ["founding", "architecture", "ux"]
           }
         ]
       },
