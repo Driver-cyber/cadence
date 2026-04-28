@@ -8,11 +8,11 @@
 
 ## 🎯 Current State
 
-**App status:** Feature-complete v1. All session 2 work merged to `main` and live. Phase 1 (Supabase migration) complete. PWA-ready. Our Lists mobile UX polished. Todo/note editing with due dates, Last Session screen, animated checkboxes, and build tracker all shipped and deployed. Cross-project dashboard linked via `cadence-tracker.html` `columns` key (fixed 2026-04-23).
+**App status:** Feature-complete v1. Phase 1 (Supabase migration) complete. iOS Safari PWA navigation bugs fixed: `position:fixed` removed from Our Lists mobile layout, App shell owns nav/footer visibility, `webkitTransform: translateZ(0)` repaint hack prevents blank screen on screen change, pull-to-refresh gesture added for PWA re-sync. Tracker `shipped[]` enriched with 13 dated items for Galaxy dashboard view. PR #19 pending merge to land all session 4 work.
 
-**Current phase:** Phase 2 planning — scope decision is the first task next session.
+**Current phase:** Phase 2 planning — scope decision is the first task after PR #19 merges.
 
-**Immediate next task:** Phase 2 brainstorm — decide real-time sync scope (todos only vs. all tables), and whether any other features (action items tab, session history stub) belong in Phase 2 before real-time work starts. Scope decision unblocks all Phase 2 coding.
+**Immediate next task:** (1) Merge PR #19 to ship iOS Safari repaint fix, pull-to-refresh, and tracker shipped[] enrichment. (2) Phase 2 brainstorm — decide real-time sync scope (todos only vs. all tables), and whether any other features belong in Phase 2 before real-time work starts.
 
 ---
 
@@ -50,6 +50,10 @@
 | 2026-04-22 | Todo + note enhancements shipped | Tap-to-expand detail card with editable text and optional due date on todos and notes. Auto-sort: dated → undated → completed (todos); dated → undated (notes). Completed todos sink to bottom, preserved for recap. |
 | 2026-04-22 | Last Session screen added as screen 1 | Replaces import flow on Welcome. Shows completed todos from most recently closed session — celebratory green banner if items done, Chad/Joelle cards with progress bars. Import flow removed from Welcome (roll-forward lives in Prep Mode). |
 | 2026-04-22 | Animated CheckBox component shipped | Custom 3-layer animation: SVG spring-pop box (`cb-pop`), checkmark stroke draw (`cb-draw`), Cadence-palette particle burst (`cb-burst`). Applied to mobile OurLists, desktop OurLists, and floating bubble. Only fires on check, not on load or uncheck. |
+| 2026-04-28 | Our Lists mobile: removed `position:fixed` | Was covering App nav/footer with a fixed overlay — architecturally wrong. App shell now hides nav/footer for `S.id === 'ourlist'` (same as Home), component renders in normal flow with `height: 100dvh`. |
+| 2026-04-28 | iOS Safari blank screen: `webkitTransform` repaint hack | After every screen change (`idx` update), a one-frame `webkitTransform: translateZ(0)` on the scroll container flushes the GPU compositor layer. Prevents blank screen without remounting components (remounting caused state loss in Our Lists). `key={S.id}` approach was tried and reverted. |
+| 2026-04-28 | Pull-to-refresh via `PullToRefresh` component | Wraps content area. Detects downward swipe from `scrollTop=0` via non-passive `touchmove`. Shows `↓` indicator, flips to `↑` at 72px threshold, reloads on release. Gives PWA users a reliable re-sync without a hard refresh. |
+| 2026-04-28 | `shipped[]` array added to tracker `columns[0]` | 13 items newest-first, each with `date`, `what`, `tags`, and optional `learned`. Feeds the Galaxy tab in the cross-project dashboard at project-dashboard-6a7.pages.dev. |
 
 ---
 
@@ -101,6 +105,8 @@
 ---
 
 ## 📝 Change Log
+
+**[2026-04-28]** — Session 4 close. iOS Safari PWA navigation bugs fixed across PRs #17–19: removed `position:fixed` from Our Lists mobile layout (App shell now owns nav/footer); added `PullToRefresh` component with pull-to-refresh gesture (swipe 72px → reload); replaced `key={S.id}` remounting with `webkitTransform` repaint hack (no state loss, reliable GPU flush). `Welcome` screen updated to `minHeight: 100dvh` as defensive measure. Tracker `shipped[]` enriched: 13 items with dates, tags, and `learned` fields for Galaxy dashboard. PR #19 open — merge to deploy.
 
 **[2026-04-23]** — Session 3 close. All session 2 work confirmed merged to `main` (PRs #13–15). Fixed `cadence-tracker.html` missing `columns` key for cross-project dashboard link. Tracker priorities rotated: "Merge branch" removed (done), Phase 2 scope decision is now #1, real-time sync is #2, session history is #3. DECISIONS.md updated to reflect clean `main` state and Phase 2 as the active next task.
 
