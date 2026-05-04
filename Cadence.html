@@ -184,7 +184,32 @@ const DEFAULT_D = {
     { label: "ORDO business income", amt: 1000, acct: "ORDO WATB", when: "By ~5th of month", note: "Transfer to Billing as needed" },
     { label: "Rental income", amt: 1000, acct: "Baselane", when: "By ~5th of month", note: "Transfer to Billing as needed" },
   ]},
-  fixedBills: 4628,
+  fixedBills: 4542,
+  fixedBillsList: [
+    { id: 'b01', name: 'Mortgage/Rent (Check)',           amount: 1400.00, note: '~22nd–24th monthly' },
+    { id: 'b02', name: 'Forest School (BRGHTWHL)',        amount:  550.00, note: '2nd monthly · Brightwheel' },
+    { id: 'b03', name: 'Auto Insurance (GEICO)',          amount:  368.27, note: 'Every month (~30th)' },
+    { id: 'b04', name: 'Car payment → Onpoint',           amount:  305.87, note: '~15th–17th monthly' },
+    { id: 'b05', name: 'Dance Classes (Groove Nation)',   amount:  340.00, note: '~2nd–3rd monthly' },
+    { id: 'b06', name: 'Stewart parents loan?',           amount:  316.00, note: '' },
+    { id: 'b07', name: 'City Vancouver Utility Water',    amount:  138.71, note: '~2nd, every other month' },
+    { id: 'b08', name: 'Personal Insurance (TRAVELERS)',  amount:  135.00, note: '12th–13th monthly' },
+    { id: 'b09', name: 'Pet Insurance (Banfield)',        amount:  178.50, note: '26th monthly' },
+    { id: 'b10', name: 'Amazon Subscriptions?',           amount:  175.00, note: '' },
+    { id: 'b11', name: 'Clark Utilities Electric',        amount:  180.00, note: '~16th–18th monthly' },
+    { id: 'b12', name: 'Student Loan (Dept of Education)',amount:   83.51, note: 'Every month (~30th)' },
+    { id: 'b13', name: 'Waste / Garbage Collection',      amount:   78.35, note: '~4th monthly' },
+    { id: 'b14', name: 'Credit Union Loan',               amount:   65.00, note: '12th monthly' },
+    { id: 'b15', name: 'Verizon Wireless',                amount:   50.00, note: '~16th–17th monthly' },
+    { id: 'b16', name: 'Apple Services',                  amount:   47.00, note: 'Varies monthly' },
+    { id: 'b17', name: 'Kids Health Insurance (DSHS)',    amount:   40.00, note: '~3rd–5th monthly' },
+    { id: 'b18', name: 'Kaiser Pmt Plan',                 amount:   27.00, note: '~25th–27th monthly' },
+    { id: 'b19', name: 'Netflix?',                        amount:   19.57, note: '' },
+    { id: 'b20', name: 'Life Insurance (USAA)',           amount:   18.15, note: '~22nd monthly' },
+    { id: 'b21', name: 'Amazon Prime',                    amount:   16.31, note: '~2nd or 28th monthly' },
+    { id: 'b22', name: 'Prime Video / PBS?',              amount:    5.43, note: '~15th–17th monthly' },
+    { id: 'b23', name: 'Google?',                         amount:    4.00, note: '' },
+  ],
   variableSpend: 2971,
   deficit: 1231,
   spending: [
@@ -232,13 +257,18 @@ const INIT = { todos: { chad: [], joelle: [] }, priorities: ['','',''], notes: [
 
 const mergeD = (saved) => {
   if (!saved || !Object.keys(saved).length) return DEFAULT_D;
+  const fixedBillsList = saved.fixedBillsList ?? DEFAULT_D.fixedBillsList;
+  const fixedBills = fixedBillsList?.length
+    ? Math.round(fixedBillsList.reduce((s, b) => s + (parseFloat(b.amount) || 0), 0))
+    : (saved.fixedBills ?? DEFAULT_D.fixedBills);
   return {
     ...DEFAULT_D, ...saved,
-    date: DEFAULT_D.date,
+    date:         saved.date         ?? DEFAULT_D.date,
     accounts:     { ...DEFAULT_D.accounts, ...(saved.accounts || {}) },
     income:       { total: saved.income?.total ?? DEFAULT_D.income.total, sources: saved.income?.sources ?? DEFAULT_D.income.sources },
     spending:     saved.spending     ?? DEFAULT_D.spending,
-    fixedBills:   saved.fixedBills   ?? DEFAULT_D.fixedBills,
+    fixedBillsList,
+    fixedBills,
     variableSpend: saved.variableSpend ?? DEFAULT_D.variableSpend,
     deficit:      saved.deficit      ?? DEFAULT_D.deficit,
   };
@@ -1667,12 +1697,49 @@ const OurListsScreen = ({ onGoHome }) => {
 };
 
 // ─── PREP MODE ────────────────────────────────────────────────────────────────
+const EditableRow = ({ idx, total, onUp, onDown, onDelete, T, fieldStyle,
+  nameValue, onNameChange, namePlaceholder,
+  noteValue, onNoteChange, notePlaceholder,
+  amountValue, onAmountChange }) => {
+  const isFirst = idx === 0;
+  const isLast = idx === total - 1;
+  const arrowBtn = (disabled) => ({
+    background:'none', border:'none', cursor: disabled ? 'default' : 'pointer',
+    color: disabled ? T.border : T.dim, fontSize:14, padding:0, lineHeight:1,
+  });
+  return (
+    <div style={{ display:'flex', alignItems:'stretch', gap:10, padding:'12px 14px', background:T.card, border:`1px solid ${T.border}`, borderRadius:14 }}>
+      <div style={{ display:'flex', flexDirection:'column', justifyContent:'center', gap:6, flexShrink:0 }}>
+        <button onClick={onUp} disabled={isFirst} style={arrowBtn(isFirst)} aria-label="Move up">▲</button>
+        <button onClick={onDown} disabled={isLast} style={arrowBtn(isLast)} aria-label="Move down">▼</button>
+      </div>
+      <div style={{ flex:1, display:'flex', flexDirection:'column', gap:6, minWidth:0 }}>
+        <input value={nameValue || ''} onChange={e=>onNameChange(e.target.value)} placeholder={namePlaceholder}
+          style={{ ...fieldStyle, fontWeight:600, padding:'7px 10px' }} />
+        <input value={noteValue || ''} onChange={e=>onNoteChange(e.target.value)} placeholder={notePlaceholder}
+          style={{ ...fieldStyle, fontSize:12, color:T.dim, padding:'6px 10px' }} />
+      </div>
+      <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+        <span style={{ color:T.dim, fontSize:14 }}>$</span>
+        <input type="number" step="0.01" value={amountValue} onChange={e=>onAmountChange(e.target.value)}
+          style={{ ...fieldStyle, width:90, textAlign:'right' }} />
+        <span style={{ color:T.dim, fontSize:12 }}>/mo</span>
+      </div>
+      <button onClick={onDelete} style={{ background:T.coralBg, color:T.coral, border:`1px solid ${T.coralMid}`, borderRadius:10, padding:'0 12px', fontSize:16, cursor:'pointer', fontWeight:700, flexShrink:0 }} aria-label="Remove">×</button>
+    </div>
+  );
+};
+
 const PrepMode = ({ onExit }) => {
   const [tab, setTab] = useState('balances');
+  const [sessionDate, setSessionDate] = useState(() => {
+    const d = new Date(D.date + ' 12:00:00');
+    return isNaN(d.getTime()) ? new Date().toISOString().slice(0,10) : d.toISOString().slice(0,10);
+  });
   const [acct, setAcct] = useState({ ...D.accounts });
   const [sources, setSources] = useState(D.income.sources.map((s,i) => ({ ...s, _id: i })));
-  const [fixedBills, setFixedBills] = useState(D.fixedBills);
-  const [spending, setSpending] = useState(D.spending.map((s,i) => ({ ...s, _id: i })));
+  const [bills, setBills] = useState((D.fixedBillsList || []).map((b,i) => ({ ...b, _id: b.id || `b_${i}_${Date.now()}` })));
+  const [spending, setSpending] = useState(D.spending.map((s,i) => ({ ...s, _id: `s_${i}` })));
   const [upcomingNotes, setUpcomingNotes] = useState(INIT.upcomingNotes);
   const [todos, setTodos] = useState(INIT.todos);
   useEffect(() => { db.loadTodos().then(t => setTodos(t)); }, []);
@@ -1682,14 +1749,31 @@ const PrepMode = ({ onExit }) => {
   const [saving, setSaving] = useState(false);
 
   const incomeTotal = Math.round(sources.reduce((s, src) => s + (parseFloat(src.amt) || 0), 0));
+  const fixedBills = Math.round(bills.reduce((s, b) => s + (parseFloat(b.amount) || 0), 0) * 100) / 100;
   const variableSpend = spending.reduce((s, sp) => s + (parseFloat(sp.mo) || 0), 0);
-  const deficit = incomeTotal - fixedBills - Math.round(variableSpend);
+  const deficit = incomeTotal - Math.round(fixedBills) - Math.round(variableSpend);
 
   const updateAcct = (k, v) => setAcct(a => ({ ...a, [k]: parseFloat(v) || 0 }));
   const updateSource = (id, k, v) => setSources(s => s.map(x => x._id===id ? { ...x, [k]: k==='amt' ? (parseFloat(v)||0) : v } : x));
   const addSource = () => setSources(s => [...s, { label:'New income source', amt:0, acct:'Billing', when:'Monthly', _id: Date.now() }]);
   const removeSource = (id) => setSources(s => s.filter(x => x._id !== id));
+
+  const moveInList = (setter) => (id, dir) => setter(arr => {
+    const i = arr.findIndex(x => x._id === id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= arr.length) return arr;
+    const next = [...arr]; [next[i], next[j]] = [next[j], next[i]]; return next;
+  });
+  const updateBill = (id, k, v) => setBills(s => s.map(x => x._id===id ? { ...x, [k]: k==='amount' ? (parseFloat(v)||0) : v } : x));
+  const moveBill = moveInList(setBills);
+  const removeBill = (id) => setBills(s => s.filter(x => x._id !== id));
+  const addBill = () => setBills(s => [...s, { _id: `b_${Date.now()}`, name: 'New bill', amount: 0, note: '' }]);
+
   const updateSpend = (id, k, v) => setSpending(s => s.map(x => x._id===id ? { ...x, [k]: k==='mo' ? (parseFloat(v)||0) : v } : x));
+  const moveSpend = moveInList(setSpending);
+  const removeSpend = (id) => setSpending(s => s.filter(x => x._id !== id));
+  const addSpend = () => setSpending(s => [...s, { _id: `s_${Date.now()}`, cat: 'New category', mo: 0, note: '', color: '#7D8A6F', lever: false }]);
+
   const toggleTodoDone = (p, id) => setTodos(t => ({ ...t, [p]: t[p].map(i => i.id===id ? { ...i, done:!i.done } : i) }));
 
   const handleSave = async () => {
@@ -1702,10 +1786,16 @@ const PrepMode = ({ onExit }) => {
       const totalDebt = (acct.sapphire||0) + (acct.ink||0);
       const newAcct = { ...acct, totalLiquid: Math.round(totalLiquid*100)/100, totalDebt: Math.round(totalDebt*100)/100, netCash: Math.round((totalLiquid - totalDebt)*100)/100 };
 
+      const dateForDisplay = sessionDate
+        ? new Date(sessionDate + 'T12:00:00').toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' })
+        : D.date;
+
       const newData = {
+        date: dateForDisplay,
         accounts: newAcct,
         income: { total: incomeTotal, sources: sources.map(({ _id, ...rest }) => rest) },
-        fixedBills,
+        fixedBills: Math.round(fixedBills),
+        fixedBillsList: bills.map(({ _id, ...rest }) => ({ ...rest, id: rest.id || _id })),
         variableSpend: Math.round(variableSpend),
         deficit,
         spending: spending.map(({ _id, ...rest }) => rest),
@@ -1740,9 +1830,10 @@ const PrepMode = ({ onExit }) => {
 
   const PREP_TABS = [
     { id:'balances', label:'💰 Balances' },
-    { id:'income', label:'📥 Income' },
-    { id:'bills', label:'🧾 Bills' },
-    { id:'session', label:'✅ Last Session' },
+    { id:'income',   label:'📥 Income' },
+    { id:'fixed',    label:'🧾 Fixed' },
+    { id:'variable', label:'🛒 Variable' },
+    { id:'session',  label:'✅ Last Session' },
     { id:'upcoming', label:'📌 Upcoming Notes' },
   ];
 
@@ -1786,6 +1877,18 @@ const PrepMode = ({ onExit }) => {
           <div>
             <p style={{ fontSize:22, fontWeight:800, marginBottom:6 }}>Account Balances</p>
             <p style={{ color:T.dim, fontSize:14, marginBottom:24 }}>Update each account to today's actual balance. The Big Picture screen will reflect these immediately.</p>
+
+            <p style={{ fontSize:12, fontWeight:800, letterSpacing:1, textTransform:'uppercase', color:T.dim, marginBottom:12 }}>Session Date</p>
+            <Card style={{ marginBottom:20 }}>
+              <div style={rowStyle}>
+                <div style={{ flex:1 }}>
+                  <span style={{ fontSize:14, color:T.ink, fontWeight:600 }}>Date shown on home screen</span>
+                  <p style={{ fontSize:12, color:T.dim, marginTop:2 }}>Updates the date on the Welcome screen for this session.</p>
+                </div>
+                <input type="date" value={sessionDate} onChange={e=>setSessionDate(e.target.value)}
+                  style={{ ...fieldStyle, width:170, fontSize:14 }} />
+              </div>
+            </Card>
 
             <p style={{ fontSize:12, fontWeight:800, letterSpacing:1, textTransform:'uppercase', color:T.dim, marginBottom:12 }}>Liquid Accounts</p>
             <Card style={{ marginBottom:20 }}>
@@ -1890,55 +1993,61 @@ const PrepMode = ({ onExit }) => {
           </div>
         )}
 
-        {/* BILLS */}
-        {tab==='bills' && (
+        {/* FIXED EXPENSES */}
+        {tab==='fixed' && (
           <div>
-            <p style={{ fontSize:22, fontWeight:800, marginBottom:6 }}>Bills & Spending</p>
-            <p style={{ color:T.dim, fontSize:14, marginBottom:24 }}>Update fixed bill totals and variable spending averages. Edit category amounts directly.</p>
+            <p style={{ fontSize:22, fontWeight:800, marginBottom:6 }}>Fixed Expenses</p>
+            <p style={{ color:T.dim, fontSize:14, marginBottom:24 }}>Recurring monthly bills. Tap any field to edit. Use ▲▼ to reorder, × to remove. Total auto-sums.</p>
 
-            <Card style={{ marginBottom:20 }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-                <div>
-                  <p style={{ fontWeight:700, fontSize:16 }}>Total Fixed Bills</p>
-                  <p style={{ fontSize:12, color:T.dim }}>All recurring monthly obligations combined</p>
-                </div>
-                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                  <span style={{ color:T.dim }}>$</span>
-                  <input type="number" value={fixedBills} onChange={e=>setFixedBills(parseFloat(e.target.value)||0)}
-                    style={{ ...fieldStyle, width:120, textAlign:'right', fontSize:20, fontWeight:800 }} />
-                </div>
-              </div>
-              <p style={{ fontSize:12, color:T.dim }}>This is the lump sum from your 22 recurring bills. Update it when bills change (e.g. Brightwheel doubling).</p>
-            </Card>
-
-            <p style={{ fontSize:12, fontWeight:800, letterSpacing:1, textTransform:'uppercase', color:T.dim, marginBottom:12 }}>Variable Spending Categories</p>
             <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:16 }}>
-              {spending.map(s => (
-                <div key={s._id} style={{ ...rowStyle, background:T.card, border:`1px solid ${T.border}`, borderRadius:14, padding:'14px 18px' }}>
-                  <div style={{ flex:1 }}>
-                    <input value={s.cat} onChange={e=>updateSpend(s._id,'cat',e.target.value)}
-                      style={{ border:'none', outline:'none', fontFamily:'inherit', fontSize:14, fontWeight:600, color:T.ink, background:'transparent', width:'100%' }} />
-                    <input value={s.note||''} onChange={e=>updateSpend(s._id,'note',e.target.value)}
-                      style={{ border:'none', outline:'none', fontFamily:'inherit', fontSize:12, color:T.dim, background:'transparent', width:'100%', marginTop:2 }} />
-                  </div>
-                  <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
-                    <span style={{ color:T.dim, fontSize:14 }}>$</span>
-                    <input type="number" value={s.mo} onChange={e=>updateSpend(s._id,'mo',e.target.value)}
-                      style={{ ...fieldStyle, width:90, textAlign:'right' }} />
-                    <span style={{ color:T.dim, fontSize:13 }}>/mo</span>
-                  </div>
-                </div>
+              {bills.map((b, idx) => (
+                <EditableRow key={b._id} idx={idx} total={bills.length}
+                  onUp={()=>moveBill(b._id, -1)} onDown={()=>moveBill(b._id, 1)} onDelete={()=>removeBill(b._id)}
+                  T={T} fieldStyle={fieldStyle}
+                  nameValue={b.name} onNameChange={v=>updateBill(b._id,'name',v)} namePlaceholder="Bill name"
+                  noteValue={b.note} onNoteChange={v=>updateBill(b._id,'note',v)} notePlaceholder="Due date / notes"
+                  amountValue={b.amount} onAmountChange={v=>updateBill(b._id,'amount',v)}
+                />
               ))}
             </div>
+            <button onClick={addBill} style={{ background:T.greenBg, color:T.green, border:`1px solid ${T.greenMid}`, borderRadius:12, padding:'11px 20px', fontSize:14, fontWeight:700, cursor:'pointer', marginBottom:20 }}>+ Add bill</button>
+
+            <Card style={{ background:T.amberBg, border:`1px solid ${T.amberMid}` }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <span style={{ fontWeight:700 }}>Total fixed bills · {bills.length} item{bills.length!==1?'s':''}</span>
+                <span style={{ fontSize:26, fontWeight:800, color:T.amber }}>{$(Math.round(fixedBills))}/mo</span>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* VARIABLE EXPENSES */}
+        {tab==='variable' && (
+          <div>
+            <p style={{ fontSize:22, fontWeight:800, marginBottom:6 }}>Variable Spending</p>
+            <p style={{ color:T.dim, fontSize:14, marginBottom:24 }}>Monthly averages by category. Tap any field to edit. Use ▲▼ to reorder, × to remove. Total auto-sums.</p>
+
+            <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:16 }}>
+              {spending.map((s, idx) => (
+                <EditableRow key={s._id} idx={idx} total={spending.length}
+                  onUp={()=>moveSpend(s._id, -1)} onDown={()=>moveSpend(s._id, 1)} onDelete={()=>removeSpend(s._id)}
+                  T={T} fieldStyle={fieldStyle}
+                  nameValue={s.cat} onNameChange={v=>updateSpend(s._id,'cat',v)} namePlaceholder="Category name"
+                  noteValue={s.note} onNoteChange={v=>updateSpend(s._id,'note',v)} notePlaceholder="Notes"
+                  amountValue={s.mo} onAmountChange={v=>updateSpend(s._id,'mo',v)}
+                />
+              ))}
+            </div>
+            <button onClick={addSpend} style={{ background:T.greenBg, color:T.green, border:`1px solid ${T.greenMid}`, borderRadius:12, padding:'11px 20px', fontSize:14, fontWeight:700, cursor:'pointer', marginBottom:20 }}>+ Add category</button>
 
             <Card style={{ background:T.coralBg, border:`1px solid ${T.coralMid}` }}>
               <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
-                <span style={{ fontWeight:700 }}>Variable total</span>
+                <span style={{ fontWeight:700 }}>Variable total · {spending.length} categor{spending.length!==1?'ies':'y'}</span>
                 <span style={{ fontSize:22, fontWeight:800, color:T.coral }}>{$(Math.round(variableSpend))}/mo</span>
               </div>
               <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
                 <span style={{ color:T.dim }}>Fixed bills</span>
-                <span style={{ fontWeight:700 }}>{$(fixedBills)}/mo</span>
+                <span style={{ fontWeight:700 }}>{$(Math.round(fixedBills))}/mo</span>
               </div>
               <div style={{ display:'flex', justifyContent:'space-between', paddingTop:8, borderTop:`1px solid ${T.coralMid}` }}>
                 <span style={{ fontWeight:700 }}>Monthly {deficit >= 0 ? 'surplus' : 'deficit'}</span>
