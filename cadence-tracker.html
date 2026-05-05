@@ -271,7 +271,7 @@
   {
     "project": "Cadence",
     "repo": "Driver-cyber/cadence",
-    "updated": "2026-04-28",
+    "updated": "2026-05-05",
     "phase": "Phase 2 Planning",
     "branch": "main",
     "deploy_url": "cadence.pages.dev",
@@ -287,6 +287,17 @@
           }
         ],
         "shipped": [
+          {
+            "date": "2026-05-05",
+            "what": "Prep Mode Bills tab split into Fixed and Variable: each list is fully editable (name, note, amount) with up/down reorder, delete, and add. 23 recurring bills seeded from original spreadsheet ($4,542/mo).",
+            "tags": ["prep-mode", "ux", "data"],
+            "learned": "A lump-sum input tells you nothing — breaking it into a named list makes it actionable and catchable when bills change."
+          },
+          {
+            "date": "2026-05-05",
+            "what": "Fixed mergeD date override bug — saved.date was always overridden by DEFAULT_D.date, keeping the home screen stuck on April 20. Session date picker added to Balances tab in Prep Mode.",
+            "tags": ["bug-fix", "prep-mode", "ux"]
+          },
           {
             "date": "2026-04-27",
             "what": "Fixed iOS Safari blank screen on home navigation using a one-frame webkitTransform repaint hack — no component remounting needed.",
@@ -385,6 +396,12 @@
     ],
     "top3": [
       {
+        "title": "Merge PR #21 + run Money Date",
+        "desc": "Merge the Prep Mode overhaul, then Chad opens Prep Mode to update balances, set today's date, clean up the 23-bill list, and run Save & Apply before the session.",
+        "status": "ready",
+        "statusLabel": "Ready"
+      },
+      {
         "title": "Phase 2 scope decision",
         "desc": "Decide real-time sync scope: todos only (lowest risk, highest value) or add priorities + notes to the same subscription. Narrow scope is safer — can expand if stable.",
         "status": "planning",
@@ -395,12 +412,6 @@
         "desc": "Supabase postgres_changes subscriptions on todos (and optionally priorities + notes) so Chad & Joelle see each other's changes live without reload.",
         "status": "planning",
         "statusLabel": "Planning"
-      },
-      {
-        "title": "Session history UI",
-        "desc": "Last Session screen shows previous accomplishments — next step is a full history list so past sessions are browsable (foundation for annual Wrapped recap).",
-        "status": "future",
-        "statusLabel": "Future"
       }
     ],
     "backlog": [
