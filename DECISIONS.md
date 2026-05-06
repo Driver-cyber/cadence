@@ -8,11 +8,11 @@
 
 ## 🎯 Current State
 
-**App status:** Feature-complete v1. Phase 1 (Supabase migration) complete. iOS Safari PWA navigation bugs fixed: `position:fixed` removed from Our Lists mobile layout, App shell owns nav/footer visibility, `webkitTransform: translateZ(0)` repaint hack prevents blank screen on screen change, pull-to-refresh gesture added for PWA re-sync. Tracker `shipped[]` enriched with 13 dated items for Galaxy dashboard view. PR #19 pending merge to land all session 4 work.
+**App status:** Feature-complete v1. All previous PRs (#17–#20) merged. Prep Mode overhauled: Bills tab split into Fixed + Variable, 23-bill list seeded from spreadsheet ($4,542/mo), both lists fully editable with reorder/delete/add, session date input added to Balances tab, mergeD date bug fixed. PR #21 open — merge to deploy.
 
-**Current phase:** Phase 2 planning — scope decision is the first task after PR #19 merges.
+**Current phase:** Session 5 wrap-up. Prep Mode ready for Chad to update before next Money Date.
 
-**Immediate next task:** (1) Merge PR #19 to ship iOS Safari repaint fix, pull-to-refresh, and tracker shipped[] enrichment. (2) Phase 2 brainstorm — decide real-time sync scope (todos only vs. all tables), and whether any other features belong in Phase 2 before real-time work starts.
+**Immediate next task:** (1) Merge PR #21 to deploy Prep Mode overhaul. (2) Chad opens Prep Mode → updates balances, sets session date to today, reviews/corrects the 23-bill list (update amounts, delete Thistle from variable, etc.), runs Save & Apply. (3) Run the Money Date session. (4) After session: Phase 2 scope decision — real-time sync scope (todos only vs. all tables).
 
 ---
 
@@ -54,6 +54,11 @@
 | 2026-04-28 | iOS Safari blank screen: `webkitTransform` repaint hack | After every screen change (`idx` update), a one-frame `webkitTransform: translateZ(0)` on the scroll container flushes the GPU compositor layer. Prevents blank screen without remounting components (remounting caused state loss in Our Lists). `key={S.id}` approach was tried and reverted. |
 | 2026-04-28 | Pull-to-refresh via `PullToRefresh` component | Wraps content area. Detects downward swipe from `scrollTop=0` via non-passive `touchmove`. Shows `↓` indicator, flips to `↑` at 72px threshold, reloads on release. Gives PWA users a reliable re-sync without a hard refresh. |
 | 2026-04-28 | `shipped[]` array added to tracker `columns[0]` | 13 items newest-first, each with `date`, `what`, `tags`, and optional `learned`. Feeds the Galaxy tab in the cross-project dashboard at project-dashboard-6a7.pages.dev. |
+| 2026-05-05 | Prep Mode Bills tab split into Fixed + Variable | Bills was a single lump-sum input. Now two full tabs: Fixed (editable bill list, auto-summed) and Variable (editable category list). Up/down reorder, delete, and add on both. |
+| 2026-05-05 | `fixedBillsList` seeded with 23 recurring bills | $4,542/mo total from original spreadsheet Monthly Cost column. Stored in `DEFAULT_D.fixedBillsList` and Supabase `budget_data`. Each bill has `name`, `amount`, `note`. |
+| 2026-05-05 | `mergeD` date override bug fixed | `mergeD` was always overriding `saved.date` with `DEFAULT_D.date` — causing the home-screen date to be stuck on "April 20, 2026" even after editing. Removed the forced override. |
+| 2026-05-05 | Session date input added to Balances tab in Prep Mode | `<input type="date">` at top of Balances tab. Saves to `D.date`, which Welcome screen displays. Defaults to the currently saved date. |
+| 2026-05-05 | `EditableRow` helper component — shared card UI for both Prep Mode lists | Name + note (both editable text inputs) + amount input + ▲▼ reorder + × delete. Used in both Fixed and Variable tabs to keep patterns consistent. |
 
 ---
 
@@ -105,6 +110,8 @@
 ---
 
 ## 📝 Change Log
+
+**[2026-05-05]** — Session 5 close. Confirmed all session 4 PRs (#17–#20) merged to main. Prep Mode overhauled in PR #21: Bills tab split into Fixed and Variable; `fixedBillsList` seeded with 23 recurring bills from original spreadsheet ($4,542/mo); both lists support full editing (name, note, amount), up/down reorder, delete, and add via shared `EditableRow` component; session date input added to Balances tab; `mergeD` bug fixed where saved date was always overridden by DEFAULT_D.date. PR #21 open — next step is merge, then Chad runs Prep Mode to update balances and bill amounts before Money Date.
 
 **[2026-04-28]** — Session 4 close. iOS Safari PWA navigation bugs fixed across PRs #17–19: removed `position:fixed` from Our Lists mobile layout (App shell now owns nav/footer); added `PullToRefresh` component with pull-to-refresh gesture (swipe 72px → reload); replaced `key={S.id}` remounting with `webkitTransform` repaint hack (no state loss, reliable GPU flush). `Welcome` screen updated to `minHeight: 100dvh` as defensive measure. Tracker `shipped[]` enriched: 13 items with dates, tags, and `learned` fields for Galaxy dashboard. PR #19 open — merge to deploy.
 
