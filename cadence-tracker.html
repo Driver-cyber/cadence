@@ -271,7 +271,7 @@
   {
     "project": "Cadence",
     "repo": "Driver-cyber/cadence",
-    "updated": "2026-05-05",
+    "updated": "2026-06-26",
     "phase": "Phase 2 Planning",
     "branch": "main",
     "deploy_url": "cadence.pages.dev",
@@ -287,6 +287,12 @@
           }
         ],
         "shipped": [
+          {
+            "date": "2026-06-26",
+            "what": "'Export for Claude' button added to the floating bubble — copies a ready-to-paste prompt plus a full JSON snapshot of the live financial picture (income, bills, spending, accounts, debt, goals, action items) and the current lists, for pasting straight into a Claude chat.",
+            "tags": ["feature", "export", "ai"],
+            "learned": "The old export only carried todos/notes — the numbers were trapped in the app. Shipping the data as JSON + a framing prompt turns the app into a bridge to an AI budget conversation."
+          },
           {
             "date": "2026-05-05",
             "what": "Prep Mode Bills tab split into Fixed and Variable: each list is fully editable (name, note, amount) with up/down reorder, delete, and add. 23 recurring bills seeded from original spreadsheet ($4,542/mo).",
@@ -396,8 +402,8 @@
     ],
     "top3": [
       {
-        "title": "Merge PR #21 + run Money Date",
-        "desc": "Merge the Prep Mode overhaul, then Chad opens Prep Mode to update balances, set today's date, clean up the 23-bill list, and run Save & Apply before the session.",
+        "title": "Merge Export-for-Claude + run Money Date",
+        "desc": "Merge the 'Export for Claude' PR, then Chad opens Prep Mode to update balances and bill amounts, sets today's date, runs Save & Apply, and uses the new export to talk through the cash-flow picture with Claude.",
         "status": "ready",
         "statusLabel": "Ready"
       },
