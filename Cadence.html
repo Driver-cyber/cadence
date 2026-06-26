@@ -2361,6 +2361,7 @@ const OurList = () => {
   const [noteInput, setNoteInput] = useState('');
   const [input, setInput] = useState('');
   const [copied, setCopied] = useState(false);
+  const [copiedAI, setCopiedAI] = useState(false);
   const [addError, setAddError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [currentHash, setCurrentHash] = useState(() => window.location.hash.replace('#','').toLowerCase());
@@ -2449,6 +2450,54 @@ const OurList = () => {
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true); setTimeout(() => setCopied(false), 3000);
     }).catch(() => { window.prompt('Copy and paste to save:', text); });
+  };
+
+  // Export the full financial picture + lists as a prompt + JSON block,
+  // ready to paste straight into a Claude chat for a Money Date debrief.
+  const shareForClaude = () => {
+    const round = (n) => Math.round((parseFloat(n) || 0) * 100) / 100;
+    const netMonthly = round(D.income.total - D.fixedBills - D.variableSpend);
+    const snapshot = {
+      exportedAt: new Date().toISOString(),
+      asOfDate: D.date,
+      monthly: {
+        income: round(D.income.total),
+        fixedBills: round(D.fixedBills),
+        variableSpend: round(D.variableSpend),
+        netMonthly,                       // positive = surplus, negative = deficit
+        statedDeficit: round(D.deficit),
+      },
+      accounts: D.accounts,
+      incomeSources: D.income.sources,
+      fixedBillsList: D.fixedBillsList.map(b => ({ name: b.name, amount: round(b.amount), note: b.note || '' })),
+      variableSpending: D.spending.map(s => ({ category: s.cat, monthly: round(s.mo), note: s.note || '', adjustable: !!s.lever })),
+      debt: { sapphire: D.accounts.sapphire, ink: D.accounts.ink, totalDebt: D.accounts.totalDebt },
+      goals: D.goals.map(g => ({ name: g.name, saved: g.saved, target: g.target, note: g.note || '' })),
+      actionItems: D._actions || [],
+      lists: {
+        chadTodos: items.chad.map(i => ({ text: i.text, done: i.done })),
+        joelleTodos: items.joelle.map(i => ({ text: i.text, done: i.done })),
+        priorities: priorities.filter(p => p.trim()),
+        notes: notesList.map(n => n.text),
+      },
+    };
+    const prompt = [
+      "We're Chad & Joelle Stewart, doing our regular \"Money Date\" — a budget review session. Below is a JSON snapshot from our finance app (Cadence) as of " + D.date + ".",
+      "",
+      "On paper the numbers look manageable, but our bank account keeps running tight / empty. Help us understand the gap. Specifically:",
+      "  • Walk through where the money actually goes each month vs. what comes in.",
+      "  • Flag anything that explains \"looks fine on paper but no cash\" — timing of income vs. bills, variable spending creep, debt interest, one-off costs, etc.",
+      "  • Point out the 2–3 highest-impact changes we could make, warmly and without judgment.",
+      "",
+      "Use \"we\" language and keep it encouraging — we want to feel in control, not anxious.",
+      "",
+      "```json",
+      JSON.stringify(snapshot, null, 2),
+      "```",
+    ].join('\n');
+    navigator.clipboard.writeText(prompt).then(() => {
+      setCopiedAI(true); setTimeout(() => setCopiedAI(false), 3000);
+    }).catch(() => { window.prompt('Copy this and paste into a Claude chat:', prompt); });
   };
 
   const totalCount = items.chad.length + items.joelle.length;
@@ -2555,7 +2604,12 @@ const OurList = () => {
             </div>
           )}
 
-          <div style={{ padding:'10px 14px 14px', borderTop:`1px solid ${T.border}`, flexShrink:0 }}>
+          <div style={{ padding:'10px 14px 14px', borderTop:`1px solid ${T.border}`, flexShrink:0, display:'flex', flexDirection:'column', gap:8 }}>
+            <button onClick={shareForClaude} style={{
+              width:'100%', background: copiedAI ? '#EFEDF7' : T.purple, color: copiedAI ? T.purple : '#fff',
+              border:`1px solid ${T.purple}`, borderRadius:12, padding:'10px',
+              fontSize:13, fontWeight:700, cursor:'pointer', transition:'all .2s'
+            }}>{copiedAI ? '✓ Copied — paste into Claude!' : '🤖 Export for Claude'}</button>
             <button onClick={share} style={{
               width:'100%', background: copied ? T.greenBg : T.ink, color: copied ? T.green : '#fff',
               border:`1px solid ${copied ? T.greenMid : T.ink}`, borderRadius:12, padding:'10px',
