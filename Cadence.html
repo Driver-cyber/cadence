@@ -1830,6 +1830,7 @@ const PrepMode = ({ onExit }) => {
         spending: spending.map(({ _id, ...rest }) => rest),
         grocery: { ...(D.grocery || {}), weekly: parseFloat(groceryWeekly) || 0 },
         cycle: D.cycle,
+        goals: D.goals,   // preserve goal progress (edited on the Goals screen, not here)
       };
 
       const notesToSave = clearNotes ? ['','','','',''] : upcomingNotes;
@@ -2512,6 +2513,233 @@ const CashFlowTimeline = ({ onPrep }) => {
   );
 };
 
+// ─── SCREEN: GOALS & PROGRESS ────────────────────────────────────────────────
+// Phase B: turn the monthly surplus into funded goals, and track + celebrate
+// progress over time. Goals + contribution history live in budget_data (no
+// schema change); saved = running total, contributions = timestamped log.
+const GOAL_ICONS = ['🛡️','🍳','🏠','🚗','✈️','👶','💍','🎓','🏖️','💰','🎯','❤️'];
+
+const GoalsProgress = ({ onPrep }) => {
+  const [goals, setGoals] = useState(() => (D.goals || []).map((g, i) => ({
+    _id: g.id || `g_${i}`, icon: g.icon || '🎯', name: g.name || 'Goal',
+    target: Number(g.target) || 0, saved: Number(g.saved) || 0, note: g.note || '',
+    contributions: Array.isArray(g.contributions) ? g.contributions : [],
+  })));
+  const [amt, setAmt] = useState({});
+  const [toast, setToast] = useState(null);
+  const [editId, setEditId] = useState(null);
+  const [adding, setAdding] = useState(false);
+  const [newGoal, setNewGoal] = useState({ name:'', target:'', icon:'🎯' });
+
+  const persist = (next) => {
+    setGoals(next);
+    const forSave = next.map(({ _id, ...g }) => ({ ...g, id: _id }));
+    D.goals = forSave;
+    db.saveBudgetData({
+      date: D.date, cycle: D.cycle, accounts: D.accounts, income: D.income,
+      grocery: D.grocery, fixedBills: D.fixedBills, fixedBillsList: D.fixedBillsList,
+      variableSpend: D.variableSpend, deficit: D.deficit, spending: D.spending,
+      goals: forSave,
+    }).catch(err => console.error('saveGoals failed:', err));
+  };
+
+  const now = new Date();
+  const inThisMonth = (iso) => { const d = new Date(iso); return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear(); };
+
+  const totalSaved = goals.reduce((s,g)=>s+g.saved,0);
+  const totalTarget = goals.reduce((s,g)=>s+g.target,0);
+  const allocatedThisMonth = goals.reduce((s,g)=> s + g.contributions.filter(c=>inThisMonth(c.date)).reduce((t,c)=>t+(Number(c.amount)||0),0), 0);
+  const monthlySurplus = (typeof D.deficit === 'number') ? D.deficit : ((D.income?.total||0) - (D.fixedBills||0) - (D.variableSpend||0));
+  const remainingToAllocate = Math.round((monthlySurplus - allocatedThisMonth)*100)/100;
+
+  const contribute = (id) => {
+    const v = parseFloat(amt[id]); if (!v || v <= 0) return;
+    const next = goals.map(g => g._id===id
+      ? { ...g, saved: Math.round((g.saved+v)*100)/100, contributions: [...g.contributions, { date: new Date().toISOString(), amount: v }] }
+      : g);
+    const g = next.find(x=>x._id===id);
+    persist(next);
+    setAmt(a => ({ ...a, [id]: '' }));
+    setToast(`🎉 ${$(v)} toward ${g.name}` + (g.target>0 && g.saved>=g.target ? ' — goal reached! 🥳' : ''));
+    setTimeout(()=>setToast(null), 2800);
+  };
+  const undoLast = (id) => persist(goals.map(g => {
+    if (g._id!==id || !g.contributions.length) return g;
+    const last = g.contributions[g.contributions.length-1];
+    return { ...g, saved: Math.round((g.saved-(Number(last.amount)||0))*100)/100, contributions: g.contributions.slice(0,-1) };
+  }));
+  const updateGoal = (id, k, v) => persist(goals.map(g => g._id===id ? { ...g, [k]: (k==='target'||k==='saved') ? (parseFloat(v)||0) : v } : g));
+  const deleteGoal = (id) => persist(goals.filter(g => g._id!==id));
+  const addGoal = () => {
+    if (!newGoal.name.trim()) return;
+    persist([...goals, { _id:`g_${Date.now()}`, icon:newGoal.icon||'🎯', name:newGoal.name.trim(), target:parseFloat(newGoal.target)||0, saved:0, note:'', contributions:[] }]);
+    setNewGoal({ name:'', target:'', icon:'🎯' }); setAdding(false);
+  };
+
+  const recent = goals.flatMap(g => g.contributions.map(c => ({ ...c, goal:g.name, icon:g.icon })))
+    .sort((a,b)=> new Date(b.date)-new Date(a.date)).slice(0,6);
+  const fmtDate = (iso) => { try { return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric'}); } catch { return ''; } };
+  const overallPct = totalTarget>0 ? Math.min(100, Math.round((totalSaved/totalTarget)*100)) : 0;
+
+  const field = { border:`1px solid ${T.border}`, borderRadius:10, padding:'8px 12px', fontSize:14, fontFamily:'inherit', outline:'none', background:'#fff', color:T.ink };
+
+  return (
+    <div style={{ padding:'clamp(20px,5vw,32px) clamp(16px,5vw,48px)', maxWidth: 920, margin:'0 auto' }}>
+      {toast && (
+        <div style={{ position:'fixed', top:18, left:'50%', transform:'translateX(-50%)', background:T.green, color:'#fff', padding:'10px 20px', borderRadius:100, fontSize:14, fontWeight:700, boxShadow:'0 6px 24px rgba(0,0,0,0.18)', zIndex:2000 }}>{toast}</div>
+      )}
+
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12, flexWrap:'wrap', marginBottom: 20 }}>
+        <SectionHeader tag="Surplus → Progress" tagColor={monthlySurplus>=0?'green':'amber'}
+          title="Goals & Progress" sub="Turn what's left each month into real progress — and celebrate every step." />
+        <button onClick={onPrep} style={{ background: T.ink, color:'#fff', border:'none', borderRadius:100, padding:'9px 18px', fontSize:13, fontWeight:700, cursor:'pointer', flexShrink:0, marginTop:4 }}>🔧 Income &amp; bills</button>
+      </div>
+
+      {/* SURPLUS */}
+      <Card style={{
+        background: monthlySurplus>=0 ? 'linear-gradient(135deg,#173528 0%,#265842 100%)' : T.amberBg,
+        border: monthlySurplus>=0 ? 'none' : `1px solid ${T.amberMid}`, color: monthlySurplus>=0 ? '#fff' : T.ink,
+        padding:'26px 24px', marginBottom: 16
+      }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', flexWrap:'wrap', gap:12 }}>
+          <div>
+            <p style={{ fontSize: 12, letterSpacing:1.2, textTransform:'uppercase', opacity: monthlySurplus>=0?.65:1, color: monthlySurplus>=0?'#fff':T.amber, fontWeight:700, marginBottom:6 }}>
+              {monthlySurplus>=0 ? 'Monthly surplus to put to work' : 'The plan runs short right now'}
+            </p>
+            <p style={{ fontSize:'clamp(34px,8vw,52px)', fontWeight:800, letterSpacing:-1.5, lineHeight:1, color: monthlySurplus>=0?'#fff':T.coral }}>
+              {monthlySurplus>=0 ? '' : '−'}{$(Math.abs(monthlySurplus))}<span style={{ fontSize:18, fontWeight:600, opacity:.6 }}>/mo</span>
+            </p>
+          </div>
+          <div style={{ textAlign:'right' }}>
+            <p style={{ fontSize:12, opacity:.7 }}>Put toward goals this month</p>
+            <p style={{ fontSize:24, fontWeight:800 }}>{$(allocatedThisMonth)}</p>
+            {monthlySurplus>0 && <p style={{ fontSize:12, opacity:.75, marginTop:2 }}>{remainingToAllocate>0 ? `${$(remainingToAllocate)} still free to allocate` : 'Fully allocated 🎉'}</p>}
+          </div>
+        </div>
+        <p style={{ fontSize:13, marginTop:14, opacity: monthlySurplus>=0?.8:1, lineHeight:1.6 }}>
+          {monthlySurplus>=0
+            ? 'Income minus fixed bills and variable spending, if the month goes to plan. Make sure This Month shows Billing covered before moving cash to savings.'
+            : 'Covering the month comes first — see This Month. On any surplus month, send the extra here.'}
+        </p>
+      </Card>
+
+      {/* OVERALL PROGRESS */}
+      <Card style={{ marginBottom: 16 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+          <p style={{ fontWeight:700 }}>Total saved toward goals</p>
+          <p style={{ fontSize:20, fontWeight:800, color:T.green }}>{$(totalSaved)} <span style={{ fontSize:13, color:T.dim, fontWeight:600 }}>of {$(totalTarget)}</span></p>
+        </div>
+        <Bar val={totalSaved} max={totalTarget||1} color={T.green} h={12} />
+        <p style={{ fontSize:12, color:T.dim, marginTop:6 }}>{overallPct}% of the way there across {goals.length} goal{goals.length!==1?'s':''}.</p>
+      </Card>
+
+      {/* GOAL CARDS */}
+      <div style={{ display:'flex', flexDirection:'column', gap:12, marginBottom:16 }}>
+        {goals.map(g => {
+          const pct = g.target>0 ? Math.min(100, Math.round((g.saved/g.target)*100)) : 0;
+          const done = g.target>0 && g.saved>=g.target;
+          const remaining = Math.max(0, g.target - g.saved);
+          const editing = editId===g._id;
+          return (
+            <Card key={g._id} style={{ border:`1px solid ${done?T.greenMid:T.border}`, background: done?T.greenBg:T.card }}>
+              <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:10 }}>
+                <span style={{ fontSize:26 }}>{g.icon}</span>
+                <div style={{ flex:1, minWidth:0 }}>
+                  {editing
+                    ? <input value={g.name} onChange={e=>updateGoal(g._id,'name',e.target.value)} style={{ ...field, width:'100%', fontWeight:700 }} />
+                    : <p style={{ fontWeight:800, fontSize:16 }}>{g.name} {done && <span style={{ color:T.green }}>🎉</span>}</p>}
+                  {!editing && g.note && <p style={{ fontSize:12, color:T.dim }}>{g.note}</p>}
+                </div>
+                <div style={{ textAlign:'right', flexShrink:0 }}>
+                  <p style={{ fontWeight:800, fontSize:16, color: done?T.green:T.ink }}>{$(g.saved)}</p>
+                  <p style={{ fontSize:11, color:T.dim }}>of {editing ? '' : $(g.target)}
+                    {editing && <input type="number" value={g.target} onChange={e=>updateGoal(g._id,'target',e.target.value)} style={{ ...field, width:90, padding:'4px 8px', textAlign:'right' }} />}
+                  </p>
+                </div>
+              </div>
+
+              <Bar val={g.saved} max={g.target||1} color={done?T.green:T.purple} h={10} />
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:T.dim, marginTop:5 }}>
+                <span>{pct}%{!done && remaining>0 ? ` · ${$(remaining)} to go` : ''}</span>
+                <span>{g.contributions.length} contribution{g.contributions.length!==1?'s':''}</span>
+              </div>
+
+              {!editing && (
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:12, flexWrap:'wrap' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                    <span style={{ color:T.dim, fontSize:14 }}>$</span>
+                    <input type="number" inputMode="decimal" placeholder="amount" value={amt[g._id]||''}
+                      onChange={e=>setAmt(a=>({ ...a, [g._id]: e.target.value }))}
+                      onKeyDown={e=>e.key==='Enter'&&contribute(g._id)}
+                      style={{ ...field, width:110, textAlign:'right' }} />
+                  </div>
+                  <button onClick={()=>contribute(g._id)} style={{ background:T.green, color:'#fff', border:'none', borderRadius:10, padding:'9px 18px', fontSize:14, fontWeight:700, cursor:'pointer' }}>+ Add contribution</button>
+                  {[100,250,500].map(q => (
+                    <button key={q} onClick={()=>setAmt(a=>({ ...a, [g._id]: String((parseFloat(a[g._id])||0)+q) }))}
+                      style={{ background:T.card, color:T.dim, border:`1px solid ${T.border}`, borderRadius:100, padding:'6px 12px', fontSize:12, fontWeight:700, cursor:'pointer' }}>+{q}</button>
+                  ))}
+                  {g.contributions.length>0 && <button onClick={()=>undoLast(g._id)} style={{ marginLeft:'auto', background:'none', border:'none', color:T.dim, fontSize:12, cursor:'pointer', textDecoration:'underline' }}>undo last</button>}
+                  <button onClick={()=>setEditId(g._id)} style={{ background:'none', border:'none', color:T.dim, fontSize:13, cursor:'pointer' }}>✏️</button>
+                </div>
+              )}
+              {editing && (
+                <div style={{ display:'flex', gap:8, marginTop:12, flexWrap:'wrap', alignItems:'center' }}>
+                  <span style={{ fontSize:12, color:T.dim }}>Icon</span>
+                  {GOAL_ICONS.map(ic => (
+                    <button key={ic} onClick={()=>updateGoal(g._id,'icon',ic)} style={{ background: g.icon===ic?T.greenBg:'transparent', border:`1px solid ${g.icon===ic?T.greenMid:T.border}`, borderRadius:8, padding:'3px 6px', fontSize:16, cursor:'pointer' }}>{ic}</button>
+                  ))}
+                  <button onClick={()=>deleteGoal(g._id)} style={{ background:T.coralBg, color:T.coral, border:`1px solid ${T.coralMid}`, borderRadius:10, padding:'7px 14px', fontSize:13, fontWeight:700, cursor:'pointer' }}>Delete</button>
+                  <button onClick={()=>setEditId(null)} style={{ marginLeft:'auto', background:T.ink, color:'#fff', border:'none', borderRadius:10, padding:'7px 16px', fontSize:13, fontWeight:700, cursor:'pointer' }}>Done</button>
+                </div>
+              )}
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* ADD GOAL */}
+      {adding ? (
+        <Card style={{ marginBottom:16 }}>
+          <p style={{ fontWeight:700, marginBottom:10 }}>New goal</p>
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center', marginBottom:10 }}>
+            <input placeholder="Goal name" value={newGoal.name} onChange={e=>setNewGoal(n=>({ ...n, name:e.target.value }))} style={{ ...field, flex:'1 1 160px' }} />
+            <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+              <span style={{ color:T.dim }}>$</span>
+              <input type="number" placeholder="target" value={newGoal.target} onChange={e=>setNewGoal(n=>({ ...n, target:e.target.value }))} style={{ ...field, width:120, textAlign:'right' }} />
+            </div>
+          </div>
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center', marginBottom:12 }}>
+            {GOAL_ICONS.map(ic => (
+              <button key={ic} onClick={()=>setNewGoal(n=>({ ...n, icon:ic }))} style={{ background: newGoal.icon===ic?T.greenBg:'transparent', border:`1px solid ${newGoal.icon===ic?T.greenMid:T.border}`, borderRadius:8, padding:'3px 7px', fontSize:17, cursor:'pointer' }}>{ic}</button>
+            ))}
+          </div>
+          <div style={{ display:'flex', gap:8 }}>
+            <button onClick={addGoal} style={{ background:T.green, color:'#fff', border:'none', borderRadius:10, padding:'9px 20px', fontSize:14, fontWeight:700, cursor:'pointer' }}>Add goal</button>
+            <button onClick={()=>{ setAdding(false); setNewGoal({ name:'', target:'', icon:'🎯' }); }} style={{ background:'none', border:`1px solid ${T.border}`, borderRadius:10, padding:'9px 18px', fontSize:14, cursor:'pointer', color:T.dim }}>Cancel</button>
+          </div>
+        </Card>
+      ) : (
+        <button onClick={()=>setAdding(true)} style={{ background:T.greenBg, color:T.green, border:`1px solid ${T.greenMid}`, borderRadius:12, padding:'11px 20px', fontSize:14, fontWeight:700, cursor:'pointer', marginBottom:16 }}>+ Add a goal</button>
+      )}
+
+      {/* RECENT ACTIVITY */}
+      {recent.length>0 && (
+        <Card>
+          <p style={{ fontWeight:700, marginBottom:10 }}>Recent progress 🎉</p>
+          {recent.map((c,i) => (
+            <div key={i} style={{ display:'flex', alignItems:'center', gap:10, padding:'7px 0', borderBottom:`1px solid ${T.border}` }}>
+              <span style={{ fontSize:16 }}>{c.icon}</span>
+              <span style={{ flex:1, fontSize:13 }}>{c.goal}</span>
+              <span style={{ fontSize:12, color:T.dim }}>{fmtDate(c.date)}</span>
+              <span style={{ fontSize:13, fontWeight:700, color:T.green, width:80, textAlign:'right' }}>+{$(Number(c.amount)||0)}</span>
+            </div>
+          ))}
+        </Card>
+      )}
+    </div>
+  );
+};
+
 const SCREENS = [
   { id:'welcome',     label:'Home',            comp: null },
   { id:'flow',        label:'This Month',      comp: CashFlowTimeline },
@@ -2520,7 +2748,7 @@ const SCREENS = [
   { id:'cashflow',    label:'Cash Flow',       comp: CashFlow },
   { id:'spending',    label:'Spending',        comp: Spending },
   { id:'debt',        label:'Debt',            comp: Debt },
-  { id:'goals',       label:'Goals',           comp: Goals },
+  { id:'goals',       label:'Goals',           comp: GoalsProgress },
   { id:'decisions',   label:'Big Decisions',   comp: BigDecisions },
   { id:'upcoming',    label:'Upcoming Changes',comp: UpcomingChanges },
   { id:'ourlist',     label:'Our Lists',       comp: OurListsScreen },

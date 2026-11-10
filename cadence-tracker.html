@@ -272,7 +272,7 @@
     "project": "Cadence",
     "repo": "Driver-cyber/cadence",
     "updated": "2026-11-10",
-    "phase": "Cash-flow pivot — Phase A shipped",
+    "phase": "Cash-flow pivot — Phase A live, Phase B on branch",
     "branch": "claude/cadence-claude-export-feature-5bxn1a",
     "deploy_url": "cadence.pages.dev",
     "columns": [
@@ -280,13 +280,19 @@
         "title": "Now",
         "priorities": [
           {
-            "title": "Open PR + deploy 'This Month'",
-            "desc": "Cash-flow timeline (Phase A) is on the branch. Open the PR, merge to deploy, then Chad sets his real first-paycheck date/amount and balances in Prep Mode and sanity-checks the coverage read.",
+            "title": "Merge Goals & Progress, then Phase C",
+            "desc": "Phase B (Goals & Progress tracker) is on the branch — review + merge to deploy. Then Phase C: a recurring-bills tracker to re-examine fixed bills, cut costs, or switch payment methods.",
             "status": "ready",
             "statusLabel": "Ready to ship"
           }
         ],
         "shipped": [
+          {
+            "date": "2026-11-10",
+            "what": "Phase B: Goals screen becomes Goals & Progress — a surplus-to-progress tracker. Shows the monthly surplus and how much is allocated this month, lets Chad & Joelle log contributions to each goal (+100/+250/+500 chips, undo, celebrate toast), tracks progress bars + % + a recent-activity log, and supports add/edit/delete. Contributions persist in budget_data (no schema change).",
+            "tags": ["feature", "goals", "progress", "pivot"],
+            "learned": "Progress sticks when it's logged and celebrated: a running contribution history + a 🎉 on every add turns 'saving' from an abstract target into a visible streak."
+          },
           {
             "date": "2026-11-10",
             "what": "Cash-flow pivot (Phase A): new 'This Month' screen walks the Billing (0970) balance forward through every paycheck, bill, and weekly grocery transfer — surfaces the low point / overdraft risk, suggests a float transfer, charts the month, and lists the full event walk. Data re-seeded to Nov 2026; Prep Mode gained bill day-of-month, income day/allocate, weekly grocery transfer, and new accounts incl. HELOC.",
@@ -387,8 +393,8 @@
         "title": "Next",
         "priorities": [
           {
-            "title": "Phase B: Surplus → Goals + progress",
-            "desc": "Once coverage is solid, show the leftover surplus and let Chad & Joelle fund goals (emergency, kitchen, roof, car) and track + celebrate progress over time.",
+            "title": "Phase C: Recurring-bills tracker",
+            "desc": "A place to re-examine fixed bills — spot things to cut, cancel, or switch payment method, and see what's eating the month.",
             "status": "planning",
             "statusLabel": "Next up"
           }
@@ -398,8 +404,8 @@
         "title": "Later",
         "priorities": [
           {
-            "title": "Phase C: Recurring-bills tracker",
-            "desc": "A place to re-examine fixed bills — spot things to cut, cancel, or switch payment method. Then: refresh/retire the old present-mode screens, and multi-account + transfers.",
+            "title": "Refresh / retire old present-mode screens",
+            "desc": "Big Picture, Cash Flow, Debt, etc. carry stale April narrative over Nov numbers. Rewrite or fold into the new flow. Then: multi-account + transfers.",
             "status": "future",
             "statusLabel": "Future"
           }
@@ -408,20 +414,20 @@
     ],
     "top3": [
       {
-        "title": "Open PR + deploy 'This Month'",
-        "desc": "Cash-flow timeline (Phase A) is on the branch. Open the PR, merge to deploy, then Chad sets real paycheck date/amount + balances in Prep Mode and checks the coverage read on the live site.",
+        "title": "Merge + deploy Goals & Progress (Phase B)",
+        "desc": "Phase B tracker is on the branch — review, merge to deploy, then check it on the live site alongside This Month.",
         "status": "ready",
         "statusLabel": "Ready"
       },
       {
-        "title": "Phase B: Surplus → Goals + progress",
-        "desc": "Surface leftover surplus, fund goals (emergency, kitchen, roof, car), and track + celebrate progress over time.",
+        "title": "Phase C: Recurring-bills tracker",
+        "desc": "Re-examine fixed bills to cut costs or change payment methods; surface what's eating the month.",
         "status": "planning",
         "statusLabel": "Next up"
       },
       {
-        "title": "Phase C: Recurring-bills tracker",
-        "desc": "Re-examine fixed bills to cut costs or change payment methods; then refresh the old present-mode screens.",
+        "title": "Refresh / retire old present-mode screens",
+        "desc": "Stale April narrative over Nov numbers — rewrite or fold into the new cash-flow flow.",
         "status": "future",
         "statusLabel": "Later"
       }
