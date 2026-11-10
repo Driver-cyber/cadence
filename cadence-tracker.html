@@ -271,22 +271,28 @@
   {
     "project": "Cadence",
     "repo": "Driver-cyber/cadence",
-    "updated": "2026-06-26",
-    "phase": "Phase 2 Planning",
-    "branch": "main",
+    "updated": "2026-11-10",
+    "phase": "Cash-flow pivot — Phase A shipped",
+    "branch": "claude/cadence-claude-export-feature-5bxn1a",
     "deploy_url": "cadence.pages.dev",
     "columns": [
       {
         "title": "Now",
         "priorities": [
           {
-            "title": "Phase 2 scope decision",
-            "desc": "Decide real-time sync scope: todos only (lowest risk, highest value) or add priorities + notes to the same subscription. Narrow scope is safer — can expand if stable.",
-            "status": "planning",
-            "statusLabel": "Decide first"
+            "title": "Open PR + deploy 'This Month'",
+            "desc": "Cash-flow timeline (Phase A) is on the branch. Open the PR, merge to deploy, then Chad sets his real first-paycheck date/amount and balances in Prep Mode and sanity-checks the coverage read.",
+            "status": "ready",
+            "statusLabel": "Ready to ship"
           }
         ],
         "shipped": [
+          {
+            "date": "2026-11-10",
+            "what": "Cash-flow pivot (Phase A): new 'This Month' screen walks the Billing (0970) balance forward through every paycheck, bill, and weekly grocery transfer — surfaces the low point / overdraft risk, suggests a float transfer, charts the month, and lists the full event walk. Data re-seeded to Nov 2026; Prep Mode gained bill day-of-month, income day/allocate, weekly grocery transfer, and new accounts incl. HELOC.",
+            "tags": ["feature", "cash-flow", "pivot", "prep-mode"],
+            "learned": "The real question families ask is timing, not totals: 'will checking cover it before payday, or do we float?' A static monthly snapshot can't answer that — a day-by-day running balance can."
+          },
           {
             "date": "2026-06-26",
             "what": "'Export for Claude' button added to the floating bubble — copies a ready-to-paste prompt plus a full JSON snapshot of the live financial picture (income, bills, spending, accounts, debt, goals, action items) and the current lists, for pasting straight into a Claude chat.",
@@ -381,10 +387,10 @@
         "title": "Next",
         "priorities": [
           {
-            "title": "Phase 2: Real-time sync",
-            "desc": "Supabase postgres_changes subscriptions on todos (and optionally priorities + notes) so Chad & Joelle see each other's changes live without reload.",
+            "title": "Phase B: Surplus → Goals + progress",
+            "desc": "Once coverage is solid, show the leftover surplus and let Chad & Joelle fund goals (emergency, kitchen, roof, car) and track + celebrate progress over time.",
             "status": "planning",
-            "statusLabel": "Planning"
+            "statusLabel": "Next up"
           }
         ]
       },
@@ -392,8 +398,8 @@
         "title": "Later",
         "priorities": [
           {
-            "title": "Session history UI",
-            "desc": "Last Session screen shows previous accomplishments — next step is a full history list so past sessions are browsable (foundation for annual Wrapped recap).",
+            "title": "Phase C: Recurring-bills tracker",
+            "desc": "A place to re-examine fixed bills — spot things to cut, cancel, or switch payment method. Then: refresh/retire the old present-mode screens, and multi-account + transfers.",
             "status": "future",
             "statusLabel": "Future"
           }
@@ -402,30 +408,30 @@
     ],
     "top3": [
       {
-        "title": "Merge Export-for-Claude + run Money Date",
-        "desc": "Merge the 'Export for Claude' PR, then Chad opens Prep Mode to update balances and bill amounts, sets today's date, runs Save & Apply, and uses the new export to talk through the cash-flow picture with Claude.",
+        "title": "Open PR + deploy 'This Month'",
+        "desc": "Cash-flow timeline (Phase A) is on the branch. Open the PR, merge to deploy, then Chad sets real paycheck date/amount + balances in Prep Mode and checks the coverage read on the live site.",
         "status": "ready",
         "statusLabel": "Ready"
       },
       {
-        "title": "Phase 2 scope decision",
-        "desc": "Decide real-time sync scope: todos only (lowest risk, highest value) or add priorities + notes to the same subscription. Narrow scope is safer — can expand if stable.",
+        "title": "Phase B: Surplus → Goals + progress",
+        "desc": "Surface leftover surplus, fund goals (emergency, kitchen, roof, car), and track + celebrate progress over time.",
         "status": "planning",
-        "statusLabel": "Decide first"
+        "statusLabel": "Next up"
       },
       {
-        "title": "Phase 2: Real-time sync",
-        "desc": "Supabase postgres_changes subscriptions on todos (and optionally priorities + notes) so Chad & Joelle see each other's changes live without reload.",
-        "status": "planning",
-        "statusLabel": "Planning"
+        "title": "Phase C: Recurring-bills tracker",
+        "desc": "Re-examine fixed bills to cut costs or change payment methods; then refresh the old present-mode screens.",
+        "status": "future",
+        "statusLabel": "Later"
       }
     ],
     "backlog": [
-      { "title": "Action items / upcoming budget tab", "tag": "feature" },
-      { "title": "Edit Mode — update balances mid-session without Prep Mode", "tag": "feature" },
-      { "title": "Annual Wrapped recap — visualize a year of Money Dates", "tag": "feature" },
+      { "title": "Multi-account map + transfers (beyond main checking)", "tag": "feature" },
+      { "title": "Refresh/retire old present-mode screens (stale April narrative)", "tag": "debt" },
+      { "title": "HELOC draw scenarios tied to home projects (kitchen/roof)", "tag": "feature" },
+      { "title": "Real-time sync (Supabase postgres_changes) — Phase 2 idea", "tag": "future" },
       { "title": "Bank CSV import — drag-and-drop, auto-categorize", "tag": "future" },
-      { "title": "Multi-month spending trends — track categories across sessions", "tag": "future" },
       { "title": "Build step for env injection — Cloudflare Pages + secrets", "tag": "infra" }
     ]
   }
