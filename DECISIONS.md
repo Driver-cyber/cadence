@@ -8,11 +8,11 @@
 
 ## 🎯 Current State
 
-**App status:** Feature-complete v1. PRs #17–#21 merged (Prep Mode overhaul: Bills split into Fixed + Variable, 23-bill list seeded, editable lists, session date, mergeD date fix). New **"Export for Claude"** button added to the floating bubble — copies a framing prompt + full JSON snapshot of the live financial picture for pasting into a Claude chat. On branch `claude/cadence-claude-export-feature-5bxn1a`, PR open — merge to deploy.
+**App status:** **Pivoting (Session 7).** Export-for-Claude merged (PR #23). Chad lost his job and had been budgeting in a Google Sheet instead of Cadence — the sheet is a **within-month cash-flow / running-balance forecast** for the Billing (0970) checking account, which Cadence never modeled. We are transforming Cadence to match that. **Phase A shipped to branch** `claude/cadence-claude-export-feature-5bxn1a` (restarted from fresh main): a new **"This Month" cash-flow timeline** screen (new screen 1) that walks the Billing balance forward through every paycheck, bill, and weekly grocery transfer, surfaces the **lowest point / overdraft risk**, and suggests a **float transfer** when it dips. Data re-seeded to the **November 2026** reality. Prep Mode extended (bill day-of-month, income day + allocate flag, weekly grocery transfer, new accounts incl. HELOC). PR not yet opened.
 
-**Current phase:** Session 6. Export-for-Claude shipped to branch; ready for Chad to merge and use for an AI budget debrief.
+**Current phase:** Session 7. Priority stack (per Chad): **#1 coverage** (will Billing cover the bills, or float?), **#2 surplus → goals + progress tracking**, **#3 recurring-bills tracker**. Prep/update flow is now the center of gravity; the old "present mode" money-date screens are kept but deprioritized (carry stale April narrative with Nov numbers — slated for a prose/remodel pass).
 
-**Immediate next task:** (1) Merge the Export-for-Claude PR to deploy. (2) Chad opens Prep Mode → updates balances + bill amounts, sets session date to today, runs Save & Apply. (3) Use the new 🤖 Export for Claude button → paste into a Claude chat to dig into the "fine on paper, empty in the bank" question. (4) Phase 2 scope decision — real-time sync scope (todos only vs. all tables).
+**Immediate next task:** (1) Open a PR for Phase A and merge to deploy. (2) Chad un-paused Supabase; open Prep Mode → set real first-paycheck date/amount + current balances → Save & Apply. (3) Confirm the "This Month" coverage read looks right on the live site. (4) Phase B: goals/surplus + progress tracking; Phase C: recurring-bills tracker; later: refresh/retire the old present-mode screens.
 
 ---
 
@@ -60,6 +60,10 @@
 | 2026-05-05 | Session date input added to Balances tab in Prep Mode | `<input type="date">` at top of Balances tab. Saves to `D.date`, which Welcome screen displays. Defaults to the currently saved date. |
 | 2026-05-05 | `EditableRow` helper component — shared card UI for both Prep Mode lists | Name + note (both editable text inputs) + amount input + ▲▼ reorder + × delete. Used in both Fixed and Variable tabs to keep patterns consistent. |
 | 2026-06-26 | "Export for Claude" button added to floating bubble | Second export action (purple, above the existing "Export session"). Copies a pre-written framing prompt + a JSON snapshot of live `D` (income, fixed/variable, accounts, debt, goals, action items) plus todos/priorities/notes. Format chosen: prompt + JSON. Placement chosen: floating bubble only. Lets Chad/Joelle hand their Money Date data to a Claude chat. Existing "Export session" (lists only) unchanged. |
+| 2026-11-10 | **Pivot: cash-flow timeline is the new center of gravity** | Chad's lived budgeting (Google Sheet) is a within-month running-balance forecast on Billing (0970), not a static monthly snapshot. The app's #1 job is now "will Billing cover the bills, or do we float?". Confirmed with Chad: timeline first · main-checking only · revive Supabase. Old money-date "present mode" kept but deprioritized. |
+| 2026-11-10 | New "This Month" screen + `buildFlow` engine | Screen 1 walks Billing day-by-day (income +, bills −, weekly grocery −), worst-case intra-day ordering, surfaces low point + float suggestion. HELOC/multi-account stays a glance for now (main-checking-first per Chad). |
+| 2026-11-10 | Remodel is additive, not a rewrite | New fields (`cycle`, `grocery`, `day`/`paused` on bills, `day`/`allocate` on income, new accounts) added alongside existing `D` fields so legacy screens keep running. Data re-seeded to Nov 2026. Prose refresh of old screens deferred. |
+| 2026-11-10 | Bills carry `day`; `paused`/`day:null` excluded from the walk | Timing is what drives overdraft. Paused items (therapy, audiobooks) stay listed + counted in the fixed total but don't debit the forecast. |
 
 ---
 
@@ -91,26 +95,37 @@
 ## 📋 Financial Snapshot (as of April 2026)
 *Baked into DEFAULT_D. Update via Prep Mode — don't edit source directly.*
 
+*Snapshot as of **November 2026** (from Chad's working Google Sheet). Income is largely theoretical — first paycheck lands ~end of Nov.*
+
 | Item | Value |
 |---|---|
-| Monthly income | $8,530 |
-| Fixed bills | $4,628 |
-| Variable spending (avg) | $2,971 |
-| Monthly deficit | ~$1,231 |
-| Net cash | $8,752 |
-| Total liquid | $16,744 |
-| Chase Sapphire (2575) | $5,886 |
-| Chase Ink (0388) | $2,105 |
-| Total CC debt | $7,992 |
+| Monthly income (expected) | ~$8,300 ($3,650 on 15th + $3,650 on 30th + ~$1,000 usable ADU rent) |
+| Fixed bills | ~$5,082/mo (24 items, now with day-of-month) |
+| Variable (weekly grocery transfer) | $510/wk into the grocery account |
+| Billing (0970) starting balance | $27 |
+| E-Save (emergency) | $2,694.54 |
+| Baselane | $4,030 |
+| OP Fun Savings | $977 |
+| CC debt (Sapphire $298 · Ink $218 · Apple $42) | ~$557 |
+| HELOC | ~$38,899 ($600/mo payment) |
 
-**Known upcoming changes:**
-- Brightwheel childcare doubling in May 2026 (~$732/mo, Levi enrolled)
-- Joelle's Premier Northwest income ($150/mo) removed — she stopped working there
-- Sapphire $1k signup bonus nearly triggered
+**Key reality:** On paper the month roughly nets out, but **bills clear before the paychecks land**, so Billing goes underwater mid/late month — the exact "good on paper, no money in the bank" problem. The new "This Month" screen makes that timing visible and suggests a float.
+
+**Known changes / notes:**
+- Chad lost his job; income is the biggest unknown — update real paycheck date/amount in Prep Mode.
+- Therapy (Jaclin) and Audiobooks.com are paused — marked `paused`, excluded from the walk.
+- Home-project goals from the sheet: Kitchen remodel (~$15.1k), Roof (~$20k), Car fund, Emergency fund.
 
 ---
 
 ## 📝 Change Log
+
+**[2026-11-10]** — Session 7, **the cash-flow pivot (Phase A)**. Context: Chad lost his job and had moved off Cadence to a Google Sheet that models a **within-month running-balance forecast** on the Billing (0970) checking account — the thing Cadence never did. Agreed direction (approved): cash-flow timeline first · main-checking only · revive Supabase. Shipped to branch (restarted from fresh main after #23 merged):
+- **New "This Month" screen** (SCREENS index 1, id `flow`, `CashFlowTimeline`). Pure engine `buildFlow(D, asOfDay)` walks the Billing balance from today through month-end, applying income (+), fixed bills (−) and weekly grocery transfers (−), outflows-before-income within a day (worst case). Surfaces the **low point / overdraft risk**, a **float suggestion** (largest positive savings account), tiles (billing now, income left, bills due, grocery left, projected end), a hand-rolled **SVG balance chart** with a danger zone below zero, the full **event walk**, and a quick debt glance (CC + HELOC). Verified: compiles via Babel; engine math checked in isolation (at day 10 → low −$1,754, end +$1,896).
+- **Data re-seeded to November 2026** in `DEFAULT_D`: real accounts (Billing, Grosh, E-Save, Baselane, OP Fun, Personal Clearing, Prop-tax), CC (Sapphire/Ink/Apple), HELOC ~$38.9k; 24 fixed bills **with `day` + `paused`**; income as 15th/30th paychecks ($3,650) + ADU rent ($1,000, `allocate`); `grocery.weekly` $510; new `cycle` field. Additive — old fields kept so legacy screens don't break.
+- **Prep Mode extended:** bill day-of-month (optional field on `EditableRow`), income `day` + `allocate` toggle, weekly grocery-transfer input, new accounts (E-Save/Fun/Clearing/Apple/HELOC) on Balances, totals updated. `mergeD` + `handleSave` carry `grocery`/`cycle`.
+- **Welcome copy** refreshed to point at "This Month" + Prep.
+- **Known debt:** old present-mode screens (Big Picture, Cash Flow, Spending, Debt, Big Decisions, Upcoming) still carry April-era narrative text over the new numbers — a few lines read oddly (e.g. Sapphire-bonus card). Deprioritized per Chad; flagged for a later prose/remodel pass. PR not yet opened.
 
 **[2026-06-26]** — Session 6. Added an **"Export for Claude"** button to the floating bubble (purple, above the existing "Export session"). It copies a ready-to-paste block: a warm framing prompt (introduces Chad & Joelle, frames the Money Date, asks the "looks fine on paper but the bank's empty" question, requests "we" language) followed by a full JSON snapshot of the live `D` object — monthly income/fixed/variable/net, all accounts, income sources with timing, the 23-bill list, variable spending categories (flagged adjustable), debt, goals, action items — plus current todos, priorities, and notes. New `shareForClaude` fn + `copiedAI` state in `FloatingBubble`. Existing `share` (lists only) untouched. Confirmed PR #21 already merged, so no tangle. On branch `claude/cadence-claude-export-feature-5bxn1a`; PR opened — merge to deploy.
 
