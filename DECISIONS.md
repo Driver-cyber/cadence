@@ -8,11 +8,11 @@
 
 ## 🎯 Current State
 
-**App status:** Feature-complete v1. All previous PRs (#17–#20) merged. Prep Mode overhauled: Bills tab split into Fixed + Variable, 23-bill list seeded from spreadsheet ($4,542/mo), both lists fully editable with reorder/delete/add, session date input added to Balances tab, mergeD date bug fixed. PR #21 open — merge to deploy.
+**App status:** Feature-complete v1. PRs #17–#21 merged (Prep Mode overhaul: Bills split into Fixed + Variable, 23-bill list seeded, editable lists, session date, mergeD date fix). New **"Export for Claude"** button added to the floating bubble — copies a framing prompt + full JSON snapshot of the live financial picture for pasting into a Claude chat. On branch `claude/cadence-claude-export-feature-5bxn1a`, PR open — merge to deploy.
 
-**Current phase:** Session 5 wrap-up. Prep Mode ready for Chad to update before next Money Date.
+**Current phase:** Session 6. Export-for-Claude shipped to branch; ready for Chad to merge and use for an AI budget debrief.
 
-**Immediate next task:** (1) Merge PR #21 to deploy Prep Mode overhaul. (2) Chad opens Prep Mode → updates balances, sets session date to today, reviews/corrects the 23-bill list (update amounts, delete Thistle from variable, etc.), runs Save & Apply. (3) Run the Money Date session. (4) After session: Phase 2 scope decision — real-time sync scope (todos only vs. all tables).
+**Immediate next task:** (1) Merge the Export-for-Claude PR to deploy. (2) Chad opens Prep Mode → updates balances + bill amounts, sets session date to today, runs Save & Apply. (3) Use the new 🤖 Export for Claude button → paste into a Claude chat to dig into the "fine on paper, empty in the bank" question. (4) Phase 2 scope decision — real-time sync scope (todos only vs. all tables).
 
 ---
 
@@ -59,6 +59,7 @@
 | 2026-05-05 | `mergeD` date override bug fixed | `mergeD` was always overriding `saved.date` with `DEFAULT_D.date` — causing the home-screen date to be stuck on "April 20, 2026" even after editing. Removed the forced override. |
 | 2026-05-05 | Session date input added to Balances tab in Prep Mode | `<input type="date">` at top of Balances tab. Saves to `D.date`, which Welcome screen displays. Defaults to the currently saved date. |
 | 2026-05-05 | `EditableRow` helper component — shared card UI for both Prep Mode lists | Name + note (both editable text inputs) + amount input + ▲▼ reorder + × delete. Used in both Fixed and Variable tabs to keep patterns consistent. |
+| 2026-06-26 | "Export for Claude" button added to floating bubble | Second export action (purple, above the existing "Export session"). Copies a pre-written framing prompt + a JSON snapshot of live `D` (income, fixed/variable, accounts, debt, goals, action items) plus todos/priorities/notes. Format chosen: prompt + JSON. Placement chosen: floating bubble only. Lets Chad/Joelle hand their Money Date data to a Claude chat. Existing "Export session" (lists only) unchanged. |
 
 ---
 
@@ -110,6 +111,8 @@
 ---
 
 ## 📝 Change Log
+
+**[2026-06-26]** — Session 6. Added an **"Export for Claude"** button to the floating bubble (purple, above the existing "Export session"). It copies a ready-to-paste block: a warm framing prompt (introduces Chad & Joelle, frames the Money Date, asks the "looks fine on paper but the bank's empty" question, requests "we" language) followed by a full JSON snapshot of the live `D` object — monthly income/fixed/variable/net, all accounts, income sources with timing, the 23-bill list, variable spending categories (flagged adjustable), debt, goals, action items — plus current todos, priorities, and notes. New `shareForClaude` fn + `copiedAI` state in `FloatingBubble`. Existing `share` (lists only) untouched. Confirmed PR #21 already merged, so no tangle. On branch `claude/cadence-claude-export-feature-5bxn1a`; PR opened — merge to deploy.
 
 **[2026-05-05]** — Session 5 close. Confirmed all session 4 PRs (#17–#20) merged to main. Prep Mode overhauled in PR #21: Bills tab split into Fixed and Variable; `fixedBillsList` seeded with 23 recurring bills from original spreadsheet ($4,542/mo); both lists support full editing (name, note, amount), up/down reorder, delete, and add via shared `EditableRow` component; session date input added to Balances tab; `mergeD` bug fixed where saved date was always overridden by DEFAULT_D.date. PR #21 open — next step is merge, then Chad runs Prep Mode to update balances and bill amounts before Money Date.
 
