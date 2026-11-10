@@ -68,6 +68,7 @@
 | 2026-11-10 | Bills carry `day`; `paused`/`day:null` excluded from the walk | Timing is what drives overdraft. Paused items (therapy, audiobooks) stay listed + counted in the fixed total but don't debit the forecast. |
 | 2026-11-10 | Phase B: Goals screen becomes a surplus→progress **tracker** | Replaces the old what-if slider sim. Shows monthly surplus, lets them log contributions, tracks progress + celebrates it. Chad's #2 priority. |
 | 2026-11-10 | Goal contributions persist in `budget_data` (no new table) | Each goal gets a timestamped `contributions[]` log; `saved` is the running total. Avoids a Supabase schema migration. Prep Mode `handleSave` must pass through `goals` so it isn't wiped. |
+| 2026-11-10 | **Prep Mode is now mobile-first** (supersedes "budget screens are desktop-first") | Chad updates on his iPhone, not at a desktop money date. Added `useIsNarrow()` hook; Income card stacks to one column, `EditableRow` (Fixed/Variable) wraps its day/amount/delete to a second line, responsive padding + scrollable tab bar. Verified via local render harness at 390px. The old desktop-first assumption no longer matches real use. |
 
 ---
 
