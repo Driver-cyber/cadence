@@ -207,16 +207,26 @@ const DEFAULT_D = {
     { label: "ADU rent (usable)", amt: 1000, acct: "Baselane", when: "Monthly", day: 5, allocate: true, note: "Available to allocate to savings / projects / bills" },
   ]},
 
-  // Weekly transfer out of Billing into the grocery account — the variable "envelope".
+  // Legacy weekly-grocery field (now represented in `transfers`; kept for back-compat).
   grocery: { weekly: 510, account: "Groceries", weeks: [2, 9, 16, 23, 30] },
 
-  // Fixed (recurring/stable) bills. `day` = day of month the charge hits Billing.
+  // ── TRANSFERS — money moved between OUR OWN accounts (out of Billing). ──
+  // `to` = destination account key. `cadence`: 'weekly' | 'monthly' | 'once'.
+  // `fund` (optional) flags a long-term transfer we track on-track-ness for:
+  //   { target, dueDate? } — dueDate present = sinking fund (dated obligation);
+  //   target with no dueDate = open-ended savings goal.
+  transfers: [
+    { id:'t01', label:'Weekly grocery envelope', amount:510, to:'groceries',    cadence:'weekly',  day:2, spendType:'spend', note:'Weekly spending money' },
+    { id:'t02', label:'Property tax savings',    amount:400, to:'propertyTax',  cadence:'monthly', day:4, note:'Toward next tax bill', fund:{ target:2400, dueDate:'2027-04-15' } },
+    { id:'t03', label:'Savings → Fun fund',      amount:200, to:'opFunSavings', cadence:'monthly', day:1, note:'OnPoint auto-transfer', fund:{ target:5000 } },
+    { id:'t04', label:'Emergency savings',       amount:0,   to:'emergency',    cadence:'monthly', day:1, note:'Paused while cash is tight', fund:{ target:10000 } },
+  ],
+
+  // Fixed (recurring/stable) bills to the OUTSIDE world. `day` = day it hits Billing.
   // `paused:true` or day:null = not debiting this month; shown but excluded from the walk.
-  fixedBills: 5082,
+  fixedBills: 4482,
   fixedBillsList: [
-    { id:'f01', name:'Savings → Fun fund',             amount:200.00,  day:1,    note:'OnPoint debit' },
     { id:'f02', name:'Audiobooks.com',                 amount:16.28,   day:1,    note:'Paused', paused:true },
-    { id:'f03', name:'Property tax transfer',          amount:400.00,  day:4,    note:'Timing flexible' },
     { id:'f04', name:'DSHS — kids health premium',     amount:60.00,   day:4,    note:'' },
     { id:'f05', name:'Waste Connections — garbage',    amount:160.00,  day:4,    note:'~every 2 months' },
     { id:'f06', name:'Puget Sound Coop CU — loan',     amount:65.00,   day:10,   note:'' },
@@ -293,6 +303,7 @@ const mergeD = (saved) => {
     accounts:     { ...DEFAULT_D.accounts, ...(saved.accounts || {}) },
     income:       { total: saved.income?.total ?? DEFAULT_D.income.total, sources: saved.income?.sources ?? DEFAULT_D.income.sources },
     grocery:      { ...DEFAULT_D.grocery, ...(saved.grocery || {}) },
+    transfers:    saved.transfers ?? DEFAULT_D.transfers,
     spending:     saved.spending     ?? DEFAULT_D.spending,
     fixedBillsList,
     fixedBills,
@@ -2313,30 +2324,51 @@ const PullToRefresh = ({ children, screenId }) => {
 };
 
 // ─── APP SHELL ────────────────────────────────────────────────────────────────
-// ─── CASH-FLOW ENGINE ────────────────────────────────────────────────────────
-// Walk the Billing account balance forward through the remaining days of the
-// month: income lands (+), fixed bills hit (−), weekly grocery transfers go out
-// (−). Returns the ordered events with a running balance, the low point, totals.
-const buildFlow = (D, asOfDay) => {
+// ─── MONEY-MOVEMENTS MODEL ───────────────────────────────────────────────────
+// Everything that moves cash is a "movement": income (+ to Billing), bill (− from
+// Billing, external), or transfer (− from Billing → one of our own accounts).
+// getMovements() unifies the (still legacy-stored) income/bills/transfers lists.
+const getMovements = (D) => {
+  const out = [];
+  (D.income?.sources || []).forEach((s, i) => {
+    if (s.allocate) return;                                              // lands elsewhere — not into Billing
+    if (!String(s.acct || '').toLowerCase().includes('billing')) return;
+    if (!(Number(s.amt) > 0)) return;
+    out.push({ id: 'inc' + i, kind: 'income', label: s.label, sub: s.when, amount: Number(s.amt), cadence: 'monthly', day: s.day, note: s.note });
+  });
+  (D.fixedBillsList || []).forEach(b => {
+    if (b.paused || b.day == null || !(Number(b.amount) > 0)) return;
+    out.push({ id: b.id, kind: 'bill', label: b.name, amount: -Number(b.amount), cadence: 'monthly', day: Number(b.day), note: b.note });
+  });
+  (D.transfers || []).forEach(t => {
+    if (t.paused || !(Number(t.amount) > 0)) return;
+    out.push({ id: t.id, kind: 'transfer', label: t.label, amount: -Number(t.amount), cadence: t.cadence || 'monthly', day: t.day, to: t.to, fund: t.fund, spendType: t.spendType, note: t.note });
+  });
+  return out;
+};
+
+// Expand one movement into the dated events it produces within [asOf, endDay].
+const expandMovement = (m, asOf, endDay) => {
+  if (m.cadence === 'weekly') {
+    const anchor = Number(m.day) || 2;
+    const evs = [];
+    for (let d = anchor; d <= endDay; d += 7) if (d >= asOf) evs.push({ ...m, day: d });
+    return evs;
+  }
+  // monthly or one-off: a single dated event
+  const d = Number(m.day);
+  return (m.day != null && d >= asOf && d <= endDay) ? [{ ...m, day: d }] : [];
+};
+
+// Walk the Billing balance forward from today through end of the cycle.
+const buildProjection = (D, asOfDay) => {
   const endDay = D.cycle?.endDay || 30;
   const start = Number(D.accounts?.billing) || 0;
 
-  const bills = (D.fixedBillsList || [])
-    .filter(b => !b.paused && b.day != null && Number(b.amount) > 0)
-    .map(b => ({ day: Number(b.day), label: b.name, amount: -Number(b.amount), kind: 'bill', note: b.note }));
-
-  const income = (D.income?.sources || [])
-    .filter(s => !s.allocate && s.day != null && Number(s.amt) > 0 && String(s.acct || '').toLowerCase().includes('billing'))
-    .map(s => ({ day: Number(s.day), label: s.label + (s.when ? ` (${s.when})` : ''), amount: Number(s.amt), kind: 'income', note: s.note }));
-
-  const gw = Number(D.grocery?.weekly) || 0;
-  const weeks = (D.grocery?.weeks || []).filter(d => d != null).map(Number);
-  const grocery = gw > 0 ? weeks.map(d => ({ day: d, label: 'Grocery transfer', amount: -gw, kind: 'grocery' })) : [];
-
-  // Only events still to come (on/after today). Within a day, outflows first (worst case).
-  const events = [...income, ...bills, ...grocery]
-    .filter(e => e.day >= asOfDay && e.day <= endDay)
-    .sort((a, b) => a.day - b.day || a.amount - b.amount);
+  const events = [];
+  getMovements(D).forEach(m => expandMovement(m, asOfDay, endDay).forEach(e => events.push(e)));
+  // Within a day, outflows before income (worst case) so the low point is honest.
+  events.sort((a, b) => a.day - b.day || a.amount - b.amount);
 
   let bal = start;
   let low = { balance: start, day: asOfDay, label: 'Starting balance' };
@@ -2347,12 +2379,36 @@ const buildFlow = (D, asOfDay) => {
     return row;
   });
 
-  const incomeTotal  = walk.filter(e => e.kind === 'income').reduce((s, e) => s + e.amount, 0);
-  const billTotal    = walk.filter(e => e.kind === 'bill').reduce((s, e) => s + e.amount, 0);
-  const groceryTotal = walk.filter(e => e.kind === 'grocery').reduce((s, e) => s + e.amount, 0);
-  const allocatable  = (D.income?.sources || []).filter(s => s.allocate).reduce((s, x) => s + (Number(x.amt) || 0), 0);
+  const sumKind = k => walk.filter(e => e.kind === k).reduce((s, e) => s + e.amount, 0);
+  const incomeTotal   = sumKind('income');
+  const billTotal     = sumKind('bill');
+  const transferTotal = sumKind('transfer');
+  const allocatable   = (D.income?.sources || []).filter(s => s.allocate).reduce((s, x) => s + (Number(x.amt) || 0), 0);
 
-  return { start, end: bal, walk, low, incomeTotal, billTotal, groceryTotal, allocatable, asOfDay, endDay };
+  return { start, end: bal, walk, low, incomeTotal, billTotal, transferTotal, groceryTotal: transferTotal, allocatable, asOfDay, endDay };
+};
+
+// Months from today until an ISO due date (rounded, min 0).
+const monthsUntil = (dueISO) => {
+  if (!dueISO) return null;
+  const now = new Date();
+  const due = new Date(dueISO + (dueISO.length <= 10 ? 'T12:00:00' : ''));
+  if (isNaN(due.getTime())) return null;
+  return Math.max(0, Math.round((due - now) / (1000 * 60 * 60 * 24 * 30.44)));
+};
+
+// Is a sinking fund on track to hit its target by its due date?
+// Projected = current account balance + (monthly transfer × months left).
+const fundStatus = (D, t) => {
+  if (!t.fund || !(Number(t.fund.target) > 0)) return null;
+  const bal = Number(D.accounts?.[t.to]) || 0;
+  const monthly = t.cadence === 'weekly' ? (Number(t.amount) || 0) * 4.33 : (Number(t.amount) || 0);
+  const months = monthsUntil(t.fund.dueDate);
+  const projected = months == null ? bal : Math.round((bal + monthly * months) * 100) / 100;
+  const target = Number(t.fund.target);
+  const onTrack = projected >= target;
+  const pct = target > 0 ? Math.min(100, Math.round((bal / target) * 100)) : 0;
+  return { bal, monthly, months, projected, target, onTrack, pct, dated: !!t.fund.dueDate, shortfall: Math.max(0, Math.round((target - projected) * 100) / 100) };
 };
 
 // Accounts a float transfer could come from, largest balance first.
@@ -2399,7 +2455,7 @@ const BalanceChart = ({ flow }) => {
 const CashFlowTimeline = ({ onPrep }) => {
   const today = new Date();
   const [asOfDay, setAsOfDay] = useState(() => Math.min(today.getDate(), D.cycle?.endDay || 30));
-  const flow = buildFlow(D, asOfDay);
+  const flow = buildProjection(D, asOfDay);
   const covered = flow.low.balance >= 0;
   const shortfall = covered ? 0 : Math.ceil((-flow.low.balance) / 50) * 50;
   const sources = floatSources(D);
@@ -2408,8 +2464,8 @@ const CashFlowTimeline = ({ onPrep }) => {
   const ccDebt = Number(D.accounts?.totalDebt) || 0;
   const heloc = Number(D.accounts?.heloc) || 0;
 
-  const kindColor = { income: T.green, bill: T.ink, grocery: T.amber };
-  const kindIcon  = { income: '💵', bill: '🧾', grocery: '🛒' };
+  const kindColor = { income: T.green, bill: T.ink, transfer: T.amber };
+  const kindIcon  = { income: '💵', bill: '🧾', transfer: '🔁' };
 
   const Tile = ({ label, value, color, sub }) => (
     <div style={{ background: T.card, border:`1px solid ${T.border}`, borderRadius: 14, padding:'14px 16px', flex:'1 1 150px', minWidth: 140 }}>
@@ -2481,7 +2537,7 @@ const CashFlowTimeline = ({ onPrep }) => {
         <Tile label="Billing now" value={$$(flow.start)} color={flow.start < 200 ? T.coral : T.ink} sub={`as of ${dayLabel(asOfDay)}`} />
         <Tile label="Still coming in" value={`+${$(flow.incomeTotal)}`} color={T.green} sub="paychecks left" />
         <Tile label="Bills still due" value={$(flow.billTotal)} color={T.ink} sub="from Billing" />
-        <Tile label="Grocery transfers" value={$(flow.groceryTotal)} color={T.amber} sub="weekly envelope" />
+        <Tile label="Transfers out" value={$(flow.transferTotal)} color={T.amber} sub="to savings / envelope" />
         <Tile label="Projected end" value={$$(flow.end)} color={flow.end < 0 ? T.coral : T.green} sub={dayLabel(flow.endDay)} />
       </div>
 
@@ -2756,9 +2812,166 @@ const GoalsProgress = ({ onPrep }) => {
   );
 };
 
+// ─── SCREEN: TRANSFERS ───────────────────────────────────────────────────────
+// Money moved between our own accounts. Three lenses on one list:
+//  • sinking funds (fund.dueDate) — on track to hit a dated target?
+//  • savings goals (fund, no dueDate) — progress toward a target
+//  • monthly spend transfers (no fund) — e.g. the weekly grocery envelope
+const TRANSFER_ACCTS = [['groceries','Groceries'],['propertyTax','Property Tax'],['emergency','E-Save'],['opFunSavings','Fun Savings'],['baselane','Baselane'],['personalClearing','Personal Clearing']];
+
+const Transfers = ({ onPrep }) => {
+  const narrow = useIsNarrow();
+  const [transfers, setTransfers] = useState(() => (D.transfers || []).map((t,i)=>({ ...t, _id: t.id || `t_${i}` })));
+  const [editId, setEditId] = useState(null);
+
+  const persist = (next) => {
+    setTransfers(next);
+    const forSave = next.map(({ _id, ...t }) => ({ ...t, id: _id }));
+    D.transfers = forSave;
+    db.saveBudgetData({
+      date:D.date, cycle:D.cycle, accounts:D.accounts, income:D.income, grocery:D.grocery,
+      fixedBills:D.fixedBills, fixedBillsList:D.fixedBillsList, variableSpend:D.variableSpend,
+      deficit:D.deficit, spending:D.spending, goals:D.goals, transfers:forSave,
+    }).catch(e=>console.error('saveTransfers failed:', e));
+  };
+  const upd = (id, patch) => persist(transfers.map(t => t._id===id ? { ...t, ...patch } : t));
+  const updFund = (id, patch) => persist(transfers.map(t => t._id===id ? { ...t, fund: { ...(t.fund||{}), ...patch } } : t));
+  const del = (id) => persist(transfers.filter(t => t._id!==id));
+  const addT = (withFund) => { const id=`t_${Date.now()}`; persist([...transfers, { _id:id, label: withFund?'New savings goal':'New transfer', amount:0, to:'emergency', cadence:'monthly', day:1, ...(withFund?{fund:{target:0}}:{}) }]); setEditId(id); };
+
+  const acctLabel = k => (TRANSFER_ACCTS.find(a=>a[0]===k)||[null,k])[1];
+  const fmtMonth = (iso) => { try { return new Date(iso+'T12:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'}); } catch { return iso; } };
+  const monthlyOut = transfers.filter(t=>!t.paused).reduce((s,t)=> s + (t.cadence==='weekly' ? (Number(t.amount)||0)*4.33 : (Number(t.amount)||0)), 0);
+
+  const funds = transfers.filter(t => t.fund);
+  const plain = transfers.filter(t => !t.fund);
+
+  const field = { border:`1px solid ${T.border}`, borderRadius:10, padding:'8px 12px', fontSize:14, fontFamily:'inherit', outline:'none', background:'#fff', color:T.ink, width:'100%' };
+
+  const AmountRow = ({ t }) => (
+    <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+      <span style={{ color:T.dim, fontSize:14 }}>$</span>
+      <input type="number" inputMode="decimal" value={t.amount} onChange={e=>upd(t._id,{ amount: parseFloat(e.target.value)||0 })} style={{ ...field, width:92, textAlign:'right' }} />
+      <span style={{ color:T.dim, fontSize:12 }}>/{t.cadence==='weekly'?'wk':'mo'}</span>
+    </div>
+  );
+
+  const Editor = ({ t }) => (
+    <div style={{ marginTop:12, paddingTop:12, borderTop:`1px solid ${T.border}`, display:'flex', flexDirection:'column', gap:10 }}>
+      <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+        <div style={{ flex:'1 1 150px' }}><span style={{ fontSize:11, color:T.dim, fontWeight:700 }}>Label</span>
+          <input value={t.label} onChange={e=>upd(t._id,{label:e.target.value})} style={field} /></div>
+        <div style={{ width:140 }}><span style={{ fontSize:11, color:T.dim, fontWeight:700 }}>To account</span>
+          <select value={t.to} onChange={e=>upd(t._id,{to:e.target.value})} style={{ ...field, padding:'8px 8px' }}>
+            {TRANSFER_ACCTS.map(([k,l])=><option key={k} value={k}>{l}</option>)}
+          </select></div>
+      </div>
+      <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'flex-end' }}>
+        <div style={{ width:120 }}><span style={{ fontSize:11, color:T.dim, fontWeight:700 }}>Cadence</span>
+          <select value={t.cadence} onChange={e=>upd(t._id,{cadence:e.target.value})} style={{ ...field, padding:'8px 8px' }}>
+            <option value="monthly">Monthly</option><option value="weekly">Weekly</option>
+          </select></div>
+        <div style={{ width:90 }}><span style={{ fontSize:11, color:T.dim, fontWeight:700 }}>{t.cadence==='weekly'?'1st day':'Day'}</span>
+          <input type="number" inputMode="numeric" min="1" max="31" value={t.day ?? ''} onChange={e=>upd(t._id,{day: e.target.value===''?null:Math.max(1,Math.min(31,parseInt(e.target.value)||1))})} style={{ ...field, textAlign:'center' }} /></div>
+        {t.fund && (<>
+          <div style={{ width:120 }}><span style={{ fontSize:11, color:T.dim, fontWeight:700 }}>Target $</span>
+            <input type="number" inputMode="decimal" value={t.fund.target ?? ''} onChange={e=>updFund(t._id,{target:parseFloat(e.target.value)||0})} style={{ ...field, textAlign:'right' }} /></div>
+          <div style={{ width:160 }}><span style={{ fontSize:11, color:T.dim, fontWeight:700 }}>Due date (optional)</span>
+            <input type="date" value={t.fund.dueDate || ''} onChange={e=>updFund(t._id,{dueDate:e.target.value||undefined})} style={{ ...field }} /></div>
+        </>)}
+      </div>
+      <div style={{ display:'flex', gap:8 }}>
+        {!t.fund && <button onClick={()=>updFund(t._id,{target:0})} style={{ background:T.greenBg, color:T.green, border:`1px solid ${T.greenMid}`, borderRadius:10, padding:'7px 14px', fontSize:13, fontWeight:700, cursor:'pointer' }}>+ Make it a goal/fund</button>}
+        {t.fund && <button onClick={()=>upd(t._id,{fund:undefined})} style={{ background:'none', color:T.dim, border:`1px solid ${T.border}`, borderRadius:10, padding:'7px 14px', fontSize:13, cursor:'pointer' }}>Remove target</button>}
+        <button onClick={()=>del(t._id)} style={{ background:T.coralBg, color:T.coral, border:`1px solid ${T.coralMid}`, borderRadius:10, padding:'7px 14px', fontSize:13, fontWeight:700, cursor:'pointer' }}>Delete</button>
+        <button onClick={()=>setEditId(null)} style={{ marginLeft:'auto', background:T.ink, color:'#fff', border:'none', borderRadius:10, padding:'7px 16px', fontSize:13, fontWeight:700, cursor:'pointer' }}>Done</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ padding:'clamp(20px,5vw,32px) clamp(16px,5vw,48px)', maxWidth: 920, margin:'0 auto' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12, flexWrap:'wrap', marginBottom: 16 }}>
+        <SectionHeader tag="Between your accounts" tagColor="amber"
+          title="Transfers" sub="Money you move out of Billing into your own accounts — spending envelopes and savings you're building up." />
+      </div>
+      <Card style={{ background:T.amberBg, border:`1px solid ${T.amberMid}`, marginBottom:16 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <span style={{ fontWeight:700 }}>Moving out of Billing each month</span>
+          <span style={{ fontSize:24, fontWeight:800, color:T.amber }}>{$(Math.round(monthlyOut))}/mo</span>
+        </div>
+      </Card>
+
+      {/* SINKING FUNDS & SAVINGS */}
+      <p style={{ fontSize:12, fontWeight:800, letterSpacing:1, textTransform:'uppercase', color:T.dim, margin:'4px 0 10px' }}>Funds &amp; savings you're building</p>
+      <div style={{ display:'flex', flexDirection:'column', gap:12, marginBottom:16 }}>
+        {funds.length===0 && <Card><p style={{ fontSize:13, color:T.dim }}>No savings funds yet. Add one below to track progress toward a goal or a dated bill (like property tax).</p></Card>}
+        {funds.map(t => {
+          const st = fundStatus(D, t);
+          const editing = editId===t._id;
+          return (
+            <Card key={t._id} style={{ border:`1px solid ${st && st.dated && !st.onTrack ? T.coralMid : T.border}` }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                <span style={{ fontSize:22 }}>{st && st.dated ? '📅' : '🎯'}</span>
+                <div style={{ flex:'1 1 150px', minWidth:0 }}>
+                  <p style={{ fontWeight:800, fontSize:15 }}>{t.label}</p>
+                  <p style={{ fontSize:12, color:T.dim }}>→ {acctLabel(t.to)} · {$(t.amount)}/{t.cadence==='weekly'?'wk':'mo'}{t.fund.dueDate?` · due ${fmtMonth(t.fund.dueDate)}`:''}</p>
+                </div>
+                <button onClick={()=>setEditId(editing?null:t._id)} style={{ background:'none', border:`1px solid ${T.border}`, borderRadius:10, padding:'6px 12px', fontSize:12, cursor:'pointer', color:T.dim, fontWeight:700 }}>{editing?'Close':'Edit'}</button>
+              </div>
+              {st && (
+                <div style={{ marginTop:10 }}>
+                  <Bar val={st.bal} max={st.target||1} color={st.onTrack ? T.green : T.coral} h={10} />
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, marginTop:6, flexWrap:'wrap', gap:4 }}>
+                    <span style={{ color:T.dim }}>{$(st.bal)} of {$(st.target)} saved</span>
+                    {st.dated
+                      ? <span style={{ fontWeight:700, color: st.onTrack ? T.green : T.coral }}>
+                          {st.onTrack ? `✓ On track — ~${$(st.projected)} by ${fmtMonth(t.fund.dueDate)}` : `⚠ Behind ~${$(st.shortfall)} — bump the transfer`}
+                        </span>
+                      : <span style={{ fontWeight:700, color:T.green }}>{st.pct}% there</span>}
+                  </div>
+                </div>
+              )}
+              {editing && <Editor t={t} />}
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* MONTHLY SPEND TRANSFERS */}
+      <p style={{ fontSize:12, fontWeight:800, letterSpacing:1, textTransform:'uppercase', color:T.dim, margin:'4px 0 10px' }}>Monthly / weekly transfers</p>
+      <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:16 }}>
+        {plain.map(t => {
+          const editing = editId===t._id;
+          return (
+            <Card key={t._id} style={{ padding:'14px 16px' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                <span style={{ fontSize:20 }}>🔁</span>
+                <div style={{ flex:'1 1 140px', minWidth:0 }}>
+                  <p style={{ fontWeight:700, fontSize:14 }}>{t.label}</p>
+                  <p style={{ fontSize:12, color:T.dim }}>→ {acctLabel(t.to)} · {t.cadence==='weekly'?'weekly':'monthly'}</p>
+                </div>
+                <AmountRow t={t} />
+                <button onClick={()=>setEditId(editing?null:t._id)} style={{ background:'none', border:`1px solid ${T.border}`, borderRadius:10, padding:'6px 12px', fontSize:12, cursor:'pointer', color:T.dim, fontWeight:700 }}>{editing?'Close':'Edit'}</button>
+              </div>
+              {editing && <Editor t={t} />}
+            </Card>
+          );
+        })}
+      </div>
+
+      <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+        <button onClick={()=>addT(false)} style={{ background:T.amberBg, color:T.amber, border:`1px solid ${T.amberMid}`, borderRadius:12, padding:'11px 18px', fontSize:14, fontWeight:700, cursor:'pointer' }}>+ Add transfer</button>
+        <button onClick={()=>addT(true)} style={{ background:T.greenBg, color:T.green, border:`1px solid ${T.greenMid}`, borderRadius:12, padding:'11px 18px', fontSize:14, fontWeight:700, cursor:'pointer' }}>+ Add savings fund</button>
+      </div>
+    </div>
+  );
+};
+
 const SCREENS = [
   { id:'welcome',     label:'Home',            comp: null },
   { id:'flow',        label:'This Month',      comp: CashFlowTimeline },
+  { id:'transfers',   label:'Transfers',       comp: Transfers },
   { id:'lastsession', label:'Last Session',    comp: LastSession },
   { id:'picture',     label:'Big Picture',     comp: BigPicture },
   { id:'cashflow',    label:'Cash Flow',       comp: CashFlow },

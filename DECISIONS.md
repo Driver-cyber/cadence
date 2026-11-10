@@ -8,6 +8,12 @@
 
 ## 🎯 Current State
 
+> **[2026-11-11] REDESIGN IN PROGRESS — "Cash-flow cockpit" (Session 8).** Zooming out to a ground-up UX/IA redesign (keeping the plumbing: single-file app, Supabase, engine, design system). **North Star:** Billing (0970) is the operating hub. The spine is **Update balances → Project (does Billing cover it?) → Allocate surplus.** Everything is a **money-movement** (`income` / `bill` / `transfer`); transfers carry an optional `fund:{target,dueDate?}` — dueDate ⇒ sinking fund (on-track tracking), target-only ⇒ savings goal. Approved forks: **manual balances now, sync-ready** · **unify into Income/Bills/Transfers** (grocery + property-tax reclassified as transfers) · **evolve in place**.
+> **Shipped so far (branch):** unified movements model + `getMovements`/`buildProjection` engine (behavior-preserving) + new **Transfers dashboard** (sinking funds w/ on-track calc, savings funds, monthly transfers; add/edit/delete, persists to `budget_data`).
+> **Next:** the spine screens (**Today** balances → **Projection** hub → **Allocate**), consolidate Prep Mode onto the movements model (retire the separate grocery input — grocery now lives in Transfers), slim the mobile nav, retire old present-mode screens.
+> *Everything below predates the redesign and is being superseded screen by screen.*
+
+
 **App status:** **Cash-flow pivot in progress (Session 7).** Chad lost his job and had been budgeting in a Google Sheet — a **within-month running-balance forecast** on Billing (0970), which Cadence never modeled. Transforming Cadence to match.
 - **Phase A — DEPLOYED (PR #24, merged):** new **"This Month"** screen walks Billing forward through paychecks/bills/weekly grocery transfers, shows the **low point / overdraft risk** + a **float suggestion**. Data re-seeded to **November 2026**. Prep Mode extended (bill day-of-month, income day + allocate, weekly grocery transfer, new accounts incl. HELOC).
 - **Phase B — shipped to branch** `claude/cadence-claude-export-feature-5bxn1a` (restarted from fresh main): the **Goals** screen is now **Goals & Progress** — shows the **monthly surplus** and how much is allocated this month, lets them **log contributions** to goals (with quick +100/+250/+500 chips, undo, celebrate toast), tracks **progress bars + % + recent-activity log**, and supports add/edit/delete goals. Goal + contribution history persist in `budget_data` (no schema change); Prep Mode `handleSave` now preserves `goals`.
