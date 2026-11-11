@@ -2388,6 +2388,30 @@ const buildProjection = (D, asOfDay) => {
   return { start, end: bal, walk, low, incomeTotal, billTotal, transferTotal, groceryTotal: transferTotal, allocatable, asOfDay, endDay };
 };
 
+// Split the projection walk into pay-period buckets (before/after a split day,
+// default the 15th) — the way the Stewarts actually decide about floats.
+// Each bucket: the paycheck(s) funding it, its bills + transfers, and whether
+// Billing stays positive through it ("autopilot") or needs a float.
+const buildPeriods = (flow, split = 15) => {
+  const bucket = (lo, hi) => flow.walk.filter(e => e.day >= lo && e.day <= hi);
+  const ranges = [];
+  if (flow.asOfDay < split) ranges.push({ key:'before', label:'Before the 15th', lo: flow.asOfDay, hi: split - 1 });
+  ranges.push({ key:'after', label: flow.asOfDay >= split ? 'Rest of the month' : 'The 15th onward', lo: Math.max(flow.asOfDay, split), hi: flow.endDay });
+
+  let entering = flow.start;
+  return ranges.map(r => {
+    const events = bucket(r.lo, r.hi);
+    const sum = k => events.filter(e => e.kind === k).reduce((s, e) => s + e.amount, 0);
+    const income = sum('income'), bills = sum('bill'), transfers = sum('transfer');
+    const bals = events.map(e => e.balance);
+    const minBal = bals.length ? Math.min(entering, ...bals) : entering;
+    const exit = bals.length ? bals[bals.length - 1] : entering;
+    const out = { ...r, entering, events, income, bills, transfers, minBal, exit, covered: minBal >= -0.005, shortfall: Math.max(0, Math.round(-minBal * 100) / 100), lowDay: (() => { let d = null, m = entering; for (const e of events) if (e.balance < m) { m = e.balance; d = e.day; } return d; })() };
+    entering = exit;
+    return out;
+  });
+};
+
 // Months from today until an ISO due date (rounded, min 0).
 const monthsUntil = (dueISO) => {
   if (!dueISO) return null;
@@ -2480,6 +2504,7 @@ const CashFlowTimeline = ({ onGo }) => {
   const today = new Date();
   const [asOfDay, setAsOfDay] = useState(() => Math.min(today.getDate(), D.cycle?.endDay || 30));
   const flow = buildProjection(D, asOfDay);
+  const periods = buildPeriods(flow);
   const covered = flow.low.balance >= 0;
   const shortfall = covered ? 0 : Math.ceil((-flow.low.balance) / 50) * 50;
   const sources = floatSources(D);
@@ -2537,6 +2562,30 @@ const CashFlowTimeline = ({ onGo }) => {
           </p>
         </Card>
       )}
+
+      {/* BY PAY PERIOD */}
+      <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: 1, textTransform:'uppercase', color: T.dim, margin:'4px 0 10px' }}>By pay period</p>
+      <div style={{ display:'flex', flexDirection:'column', gap: 10, marginBottom: 16 }}>
+        {periods.map(p => (
+          <Card key={p.key} style={{ border:`1px solid ${p.covered ? T.greenMid : T.coralMid}`, background: p.covered ? T.greenBg : T.coralBg, padding:'16px 18px' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8, flexWrap:'wrap' }}>
+              <p style={{ fontWeight:800, fontSize:15 }}>{p.label}</p>
+              <p style={{ fontSize:12, color:T.dim }}>starts at {$$(p.entering)}</p>
+            </div>
+            <div style={{ display:'flex', gap:14, flexWrap:'wrap', margin:'8px 0 10px', fontSize:13 }}>
+              <span style={{ color: T.green, fontWeight:700 }}>💵 +{$(p.income)} in</span>
+              <span style={{ color: T.ink }}>🧾 {$(Math.abs(p.bills))} bills</span>
+              <span style={{ color: T.amber }}>🔁 {$(Math.abs(p.transfers))} transfers</span>
+              <span style={{ color: p.exit < 0 ? T.coral : T.dim, fontWeight:700 }}>→ ends {$$(p.exit)}</span>
+            </div>
+            <p style={{ fontSize:13, fontWeight:700, color: p.covered ? T.green : T.coral }}>
+              {p.covered
+                ? '✓ On autopilot — the paycheck covers it, no transfer needed'
+                : `⚠ Dips to −${$(p.shortfall)}${p.lowDay ? ` around ${dayLabel(p.lowDay)}` : ''} — float ~${$(Math.ceil(p.shortfall/50)*50)} in before then`}
+            </p>
+          </Card>
+        ))}
+      </div>
 
       {/* CHART */}
       <Card style={{ marginBottom: 16 }}>
