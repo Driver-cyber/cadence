@@ -216,7 +216,7 @@ const DEFAULT_D = {
   //   { target, dueDate? } — dueDate present = sinking fund (dated obligation);
   //   target with no dueDate = open-ended savings goal.
   transfers: [
-    { id:'t01', label:'Weekly grocery envelope', amount:510, to:'groceries',    cadence:'weekly',  day:2, spendType:'spend', note:'Weekly spending money' },
+    { id:'t01', label:'Grocery envelope (every Friday)', amount:510, to:'groceries', cadence:'weekly', weekday:5, spendType:'spend', note:'Every Friday · auto-counts 4 or 5 per month' },
     { id:'t02', label:'Property tax savings',    amount:400, to:'propertyTax',  cadence:'monthly', day:4, note:'Toward next tax bill', fund:{ target:2400, dueDate:'2027-04-15' } },
     { id:'t03', label:'Savings → Fun fund',      amount:200, to:'opFunSavings', cadence:'monthly', day:1, note:'OnPoint auto-transfer', fund:{ target:5000 } },
     { id:'t04', label:'Emergency savings',       amount:0,   to:'emergency',    cadence:'monthly', day:1, note:'Paused while cash is tight', fund:{ target:10000 } },
@@ -2342,31 +2342,60 @@ const getMovements = (D) => {
   });
   (D.transfers || []).forEach(t => {
     if (t.paused || !(Number(t.amount) > 0)) return;
-    out.push({ id: t.id, kind: 'transfer', label: t.label, amount: -Number(t.amount), cadence: t.cadence || 'monthly', day: t.day, to: t.to, fund: t.fund, spendType: t.spendType, note: t.note });
+    out.push({ id: t.id, kind: 'transfer', label: t.label, amount: -Number(t.amount), cadence: t.cadence || 'monthly', day: t.day, weekday: t.weekday, days: t.days, to: t.to, fund: t.fund, spendType: t.spendType, note: t.note });
   });
   return out;
 };
 
+// The calendar month the cycle covers → { year, month(0-indexed) }. Lets weekly
+// schedules land on real weekdays (so "every Friday" is 4 or 5 times automatically).
+const WEEKDAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const cycleBase = (D) => {
+  const lbl = D.cycle?.label || '';
+  const parts = lbl.trim().split(/\s+/);
+  const guess = parts.length >= 2 ? new Date(`${parts[0]} 1, ${parts[1]}`) : new Date();
+  const d = isNaN(guess.getTime()) ? new Date() : guess;
+  return { year: d.getFullYear(), month: d.getMonth() };
+};
+
 // Expand one movement into the dated events it produces within [asOf, endDay].
-const expandMovement = (m, asOf, endDay) => {
-  if (m.cadence === 'weekly') {
-    const anchor = Number(m.day) || 2;
+// cadence: 'monthly' (one `day`), 'weekly' (every `weekday` 0–6, or legacy `day`
+// anchor), 'semimonthly' (two `days`, e.g. [15,30]), 'once' (single `day`).
+const expandMovement = (m, asOf, endDay, base) => {
+  if (m.cadence === 'weekly' && m.weekday != null) {
     const evs = [];
+    for (let d = 1; d <= endDay; d++)
+      if (new Date(base.year, base.month, d).getDay() === Number(m.weekday) && d >= asOf) evs.push({ ...m, day: d });
+    return evs;
+  }
+  if (m.cadence === 'weekly') {                       // legacy: anchor day + 7
+    const anchor = Number(m.day) || 2; const evs = [];
     for (let d = anchor; d <= endDay; d += 7) if (d >= asOf) evs.push({ ...m, day: d });
     return evs;
   }
-  // monthly or one-off: a single dated event
-  const d = Number(m.day);
+  if (m.cadence === 'semimonthly') {
+    return (m.days || []).map(Number).filter(d => d != null && d >= asOf && d <= endDay).map(d => ({ ...m, day: d }));
+  }
+  const d = Number(m.day);                             // monthly / once
   return (m.day != null && d >= asOf && d <= endDay) ? [{ ...m, day: d }] : [];
+};
+
+// Rough monthly equivalent of a movement's amount (for totals / fund tracking).
+const monthlyEquivalent = (m) => {
+  const a = Number(m.amount) || 0;
+  if (m.cadence === 'weekly') return a * 4.33;
+  if (m.cadence === 'semimonthly') return a * (m.days?.length || 2);
+  return a;
 };
 
 // Walk the Billing balance forward from today through end of the cycle.
 const buildProjection = (D, asOfDay) => {
   const endDay = D.cycle?.endDay || 30;
   const start = Number(D.accounts?.billing) || 0;
+  const base = cycleBase(D);
 
   const events = [];
-  getMovements(D).forEach(m => expandMovement(m, asOfDay, endDay).forEach(e => events.push(e)));
+  getMovements(D).forEach(m => expandMovement(m, asOfDay, endDay, base).forEach(e => events.push(e)));
   // Within a day, outflows before income (worst case) so the low point is honest.
   events.sort((a, b) => a.day - b.day || a.amount - b.amount);
 
@@ -2426,7 +2455,7 @@ const monthsUntil = (dueISO) => {
 const fundStatus = (D, t) => {
   if (!t.fund || !(Number(t.fund.target) > 0)) return null;
   const bal = Number(D.accounts?.[t.to]) || 0;
-  const monthly = t.cadence === 'weekly' ? (Number(t.amount) || 0) * 4.33 : (Number(t.amount) || 0);
+  const monthly = monthlyEquivalent(t);
   const months = monthsUntil(t.fund.dueDate);
   const projected = months == null ? bal : Math.round((bal + monthly * months) * 100) / 100;
   const target = Number(t.fund.target);
@@ -2963,8 +2992,10 @@ const Transfers = ({ onGo }) => {
   const addT = (withFund) => { const id=`t_${Date.now()}`; persist([...transfers, { _id:id, label: withFund?'New savings goal':'New transfer', amount:0, to:'emergency', cadence:'monthly', day:1, ...(withFund?{fund:{target:0}}:{}) }]); setEditId(id); };
 
   const acctLabel = k => (TRANSFER_ACCTS.find(a=>a[0]===k)||[null,k])[1];
+  const cadenceDesc = (t) => t.cadence==='weekly' ? `every ${WEEKDAYS[t.weekday ?? 5]}` : t.cadence==='semimonthly' ? `twice monthly (${(t.days||[15,30]).filter(x=>x!=null).join(' & ')})` : 'monthly';
+  const perLabel = (t) => t.cadence==='weekly' ? '/wk' : t.cadence==='semimonthly' ? ' ea' : '/mo';
   const fmtMonth = (iso) => { try { return new Date(iso+'T12:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'}); } catch { return iso; } };
-  const monthlyOut = transfers.filter(t=>!t.paused).reduce((s,t)=> s + (t.cadence==='weekly' ? (Number(t.amount)||0)*4.33 : (Number(t.amount)||0)), 0);
+  const monthlyOut = transfers.filter(t=>!t.paused).reduce((s,t)=> s + monthlyEquivalent(t), 0);
 
   const funds = transfers.filter(t => t.fund);
   const plain = transfers.filter(t => !t.fund);
@@ -2975,7 +3006,7 @@ const Transfers = ({ onGo }) => {
     <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
       <span style={{ color:T.dim, fontSize:14 }}>$</span>
       <input type="number" inputMode="decimal" value={t.amount} onChange={e=>upd(t._id,{ amount: parseFloat(e.target.value)||0 })} style={{ ...field, width:92, textAlign:'right' }} />
-      <span style={{ color:T.dim, fontSize:12 }}>/{t.cadence==='weekly'?'wk':'mo'}</span>
+      <span style={{ color:T.dim, fontSize:12 }}>{perLabel(t)}</span>
     </div>
   );
 
@@ -2990,12 +3021,31 @@ const Transfers = ({ onGo }) => {
           </select></div>
       </div>
       <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'flex-end' }}>
-        <div style={{ width:120 }}><span style={{ fontSize:11, color:T.dim, fontWeight:700 }}>Cadence</span>
-          <select value={t.cadence} onChange={e=>upd(t._id,{cadence:e.target.value})} style={{ ...field, padding:'8px 8px' }}>
-            <option value="monthly">Monthly</option><option value="weekly">Weekly</option>
+        <div style={{ width:150 }}><span style={{ fontSize:11, color:T.dim, fontWeight:700 }}>How often</span>
+          <select value={t.cadence} onChange={e=>{ const v=e.target.value; upd(t._id,{ cadence:v, ...(v==='semimonthly'&&!(t.days&&t.days.length)?{days:[15,30]}:{}), ...(v==='weekly'&&t.weekday==null?{weekday:5}:{}) }); }} style={{ ...field, padding:'8px 8px' }}>
+            <option value="monthly">Monthly</option>
+            <option value="weekly">Weekly (a weekday)</option>
+            <option value="semimonthly">Twice a month</option>
           </select></div>
-        <div style={{ width:90 }}><span style={{ fontSize:11, color:T.dim, fontWeight:700 }}>{t.cadence==='weekly'?'1st day':'Day'}</span>
-          <input type="number" inputMode="numeric" min="1" max="31" value={t.day ?? ''} onChange={e=>upd(t._id,{day: e.target.value===''?null:Math.max(1,Math.min(31,parseInt(e.target.value)||1))})} style={{ ...field, textAlign:'center' }} /></div>
+        {t.cadence==='monthly' && (
+          <div style={{ width:84 }}><span style={{ fontSize:11, color:T.dim, fontWeight:700 }}>Day</span>
+            <input type="number" inputMode="numeric" min="1" max="31" value={t.day ?? ''} onChange={e=>upd(t._id,{day: e.target.value===''?null:Math.max(1,Math.min(31,parseInt(e.target.value)||1))})} style={{ ...field, textAlign:'center' }} /></div>
+        )}
+        {t.cadence==='weekly' && (
+          <div style={{ width:140 }}><span style={{ fontSize:11, color:T.dim, fontWeight:700 }}>On</span>
+            <select value={t.weekday ?? 5} onChange={e=>upd(t._id,{weekday:parseInt(e.target.value)})} style={{ ...field, padding:'8px 8px' }}>
+              {WEEKDAYS.map((w,i)=><option key={i} value={i}>{w}</option>)}
+            </select></div>
+        )}
+        {t.cadence==='semimonthly' && (
+          <div style={{ display:'flex', alignItems:'flex-end', gap:6 }}>
+            {[0,1].map(i => (
+              <div key={i} style={{ width:70 }}><span style={{ fontSize:11, color:T.dim, fontWeight:700 }}>Day {i+1}</span>
+                <input type="number" inputMode="numeric" min="1" max="31" value={(t.days&&t.days[i]) ?? ''} onChange={e=>{ const days=[...(t.days||[15,30])]; days[i]=e.target.value===''?null:Math.max(1,Math.min(31,parseInt(e.target.value)||1)); upd(t._id,{days}); }} style={{ ...field, textAlign:'center' }} /></div>
+            ))}
+            <button onClick={()=>upd(t._id,{days:[15,30]})} style={{ background:T.greenBg, color:T.green, border:`1px solid ${T.greenMid}`, borderRadius:8, padding:'8px 10px', fontSize:11, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' }}>mirror paychecks</button>
+          </div>
+        )}
         {t.fund && (<>
           <div style={{ width:120 }}><span style={{ fontSize:11, color:T.dim, fontWeight:700 }}>Target $</span>
             <input type="number" inputMode="decimal" value={t.fund.target ?? ''} onChange={e=>updFund(t._id,{target:parseFloat(e.target.value)||0})} style={{ ...field, textAlign:'right' }} /></div>
@@ -3038,7 +3088,7 @@ const Transfers = ({ onGo }) => {
                 <span style={{ fontSize:22 }}>{st && st.dated ? '📅' : '🎯'}</span>
                 <div style={{ flex:'1 1 150px', minWidth:0 }}>
                   <p style={{ fontWeight:800, fontSize:15 }}>{t.label}</p>
-                  <p style={{ fontSize:12, color:T.dim }}>→ {acctLabel(t.to)} · {$(t.amount)}/{t.cadence==='weekly'?'wk':'mo'}{t.fund.dueDate?` · due ${fmtMonth(t.fund.dueDate)}`:''}</p>
+                  <p style={{ fontSize:12, color:T.dim }}>→ {acctLabel(t.to)} · {$(t.amount)}{perLabel(t)} · {cadenceDesc(t)}{t.fund.dueDate?` · due ${fmtMonth(t.fund.dueDate)}`:''}</p>
                 </div>
                 <button onClick={()=>setEditId(editing?null:t._id)} style={{ background:'none', border:`1px solid ${T.border}`, borderRadius:10, padding:'6px 12px', fontSize:12, cursor:'pointer', color:T.dim, fontWeight:700 }}>{editing?'Close':'Edit'}</button>
               </div>
@@ -3072,7 +3122,7 @@ const Transfers = ({ onGo }) => {
                 <span style={{ fontSize:20 }}>🔁</span>
                 <div style={{ flex:'1 1 140px', minWidth:0 }}>
                   <p style={{ fontWeight:700, fontSize:14 }}>{t.label}</p>
-                  <p style={{ fontSize:12, color:T.dim }}>→ {acctLabel(t.to)} · {t.cadence==='weekly'?'weekly':'monthly'}</p>
+                  <p style={{ fontSize:12, color:T.dim }}>→ {acctLabel(t.to)} · {cadenceDesc(t)}</p>
                 </div>
                 <AmountRow t={t} />
                 <button onClick={()=>setEditId(editing?null:t._id)} style={{ background:'none', border:`1px solid ${T.border}`, borderRadius:10, padding:'6px 12px', fontSize:12, cursor:'pointer', color:T.dim, fontWeight:700 }}>{editing?'Close':'Edit'}</button>
