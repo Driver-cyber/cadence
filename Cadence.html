@@ -168,6 +168,18 @@ window.generateListHTML = function(items) {
 <script type="text/babel">
 const { useState, useEffect } = React;
 
+// True on narrow (phone) viewports — lets layouts stack instead of overflow.
+const useIsNarrow = (bp = 640) => {
+  const [narrow, setNarrow] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < bp : false));
+  useEffect(() => {
+    const on = () => setNarrow(window.innerWidth < bp);
+    on();
+    window.addEventListener('resize', on);
+    return () => window.removeEventListener('resize', on);
+  }, [bp]);
+  return narrow;
+};
+
 // ─── DATA ─────────────────────────────────────────────────────────────────────
 const DEFAULT_D = {
   date: "November 10, 2026",
@@ -195,16 +207,26 @@ const DEFAULT_D = {
     { label: "ADU rent (usable)", amt: 1000, acct: "Baselane", when: "Monthly", day: 5, allocate: true, note: "Available to allocate to savings / projects / bills" },
   ]},
 
-  // Weekly transfer out of Billing into the grocery account — the variable "envelope".
+  // Legacy weekly-grocery field (now represented in `transfers`; kept for back-compat).
   grocery: { weekly: 510, account: "Groceries", weeks: [2, 9, 16, 23, 30] },
 
-  // Fixed (recurring/stable) bills. `day` = day of month the charge hits Billing.
+  // ── TRANSFERS — money moved between OUR OWN accounts (out of Billing). ──
+  // `to` = destination account key. `cadence`: 'weekly' | 'monthly' | 'once'.
+  // `fund` (optional) flags a long-term transfer we track on-track-ness for:
+  //   { target, dueDate? } — dueDate present = sinking fund (dated obligation);
+  //   target with no dueDate = open-ended savings goal.
+  transfers: [
+    { id:'t01', label:'Weekly grocery envelope', amount:510, to:'groceries',    cadence:'weekly',  day:2, spendType:'spend', note:'Weekly spending money' },
+    { id:'t02', label:'Property tax savings',    amount:400, to:'propertyTax',  cadence:'monthly', day:4, note:'Toward next tax bill', fund:{ target:2400, dueDate:'2027-04-15' } },
+    { id:'t03', label:'Savings → Fun fund',      amount:200, to:'opFunSavings', cadence:'monthly', day:1, note:'OnPoint auto-transfer', fund:{ target:5000 } },
+    { id:'t04', label:'Emergency savings',       amount:0,   to:'emergency',    cadence:'monthly', day:1, note:'Paused while cash is tight', fund:{ target:10000 } },
+  ],
+
+  // Fixed (recurring/stable) bills to the OUTSIDE world. `day` = day it hits Billing.
   // `paused:true` or day:null = not debiting this month; shown but excluded from the walk.
-  fixedBills: 5082,
+  fixedBills: 4482,
   fixedBillsList: [
-    { id:'f01', name:'Savings → Fun fund',             amount:200.00,  day:1,    note:'OnPoint debit' },
     { id:'f02', name:'Audiobooks.com',                 amount:16.28,   day:1,    note:'Paused', paused:true },
-    { id:'f03', name:'Property tax transfer',          amount:400.00,  day:4,    note:'Timing flexible' },
     { id:'f04', name:'DSHS — kids health premium',     amount:60.00,   day:4,    note:'' },
     { id:'f05', name:'Waste Connections — garbage',    amount:160.00,  day:4,    note:'~every 2 months' },
     { id:'f06', name:'Puget Sound Coop CU — loan',     amount:65.00,   day:10,   note:'' },
@@ -281,6 +303,7 @@ const mergeD = (saved) => {
     accounts:     { ...DEFAULT_D.accounts, ...(saved.accounts || {}) },
     income:       { total: saved.income?.total ?? DEFAULT_D.income.total, sources: saved.income?.sources ?? DEFAULT_D.income.sources },
     grocery:      { ...DEFAULT_D.grocery, ...(saved.grocery || {}) },
+    transfers:    saved.transfers ?? DEFAULT_D.transfers,
     spending:     saved.spending     ?? DEFAULT_D.spending,
     fixedBillsList,
     fixedBills,
@@ -1720,36 +1743,39 @@ const EditableRow = ({ idx, total, onUp, onDown, onDelete, T, fieldStyle,
   dayValue, onDayChange }) => {
   const isFirst = idx === 0;
   const isLast = idx === total - 1;
+  const narrow = useIsNarrow();
   const arrowBtn = (disabled) => ({
     background:'none', border:'none', cursor: disabled ? 'default' : 'pointer',
-    color: disabled ? T.border : T.dim, fontSize:14, padding:0, lineHeight:1,
+    color: disabled ? T.border : T.dim, fontSize:16, padding:'0 2px', lineHeight:1,
   });
   return (
-    <div style={{ display:'flex', alignItems:'stretch', gap:10, padding:'12px 14px', background:T.card, border:`1px solid ${T.border}`, borderRadius:14 }}>
+    <div style={{ display:'flex', flexWrap:'wrap', alignItems:'stretch', gap:10, padding:'12px 14px', background:T.card, border:`1px solid ${T.border}`, borderRadius:14 }}>
       <div style={{ display:'flex', flexDirection:'column', justifyContent:'center', gap:6, flexShrink:0 }}>
         <button onClick={onUp} disabled={isFirst} style={arrowBtn(isFirst)} aria-label="Move up">▲</button>
         <button onClick={onDown} disabled={isLast} style={arrowBtn(isLast)} aria-label="Move down">▼</button>
       </div>
-      <div style={{ flex:1, display:'flex', flexDirection:'column', gap:6, minWidth:0 }}>
+      <div style={{ flex:'1 1 55%', display:'flex', flexDirection:'column', gap:6, minWidth:0 }}>
         <input value={nameValue || ''} onChange={e=>onNameChange(e.target.value)} placeholder={namePlaceholder}
           style={{ ...fieldStyle, fontWeight:600, padding:'7px 10px' }} />
         <input value={noteValue || ''} onChange={e=>onNoteChange(e.target.value)} placeholder={notePlaceholder}
           style={{ ...fieldStyle, fontSize:12, color:T.dim, padding:'6px 10px' }} />
       </div>
-      {onDayChange && (
-        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:2, flexShrink:0, justifyContent:'center' }}>
-          <input type="number" min="1" max="31" value={dayValue ?? ''} onChange={e=>onDayChange(e.target.value)} placeholder="—"
-            style={{ ...fieldStyle, width:48, textAlign:'center', padding:'7px 4px' }} aria-label="Day of month" />
-          <span style={{ color:T.dim, fontSize:10 }}>day</span>
+      <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0, ...(narrow ? { width:'100%', justifyContent:'flex-end' } : {}) }}>
+        {onDayChange && (
+          <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:2, flexShrink:0, justifyContent:'center' }}>
+            <input type="number" inputMode="numeric" min="1" max="31" value={dayValue ?? ''} onChange={e=>onDayChange(e.target.value)} placeholder="—"
+              style={{ ...fieldStyle, width:52, textAlign:'center', padding:'7px 4px' }} aria-label="Day of month" />
+            <span style={{ color:T.dim, fontSize:10 }}>day</span>
+          </div>
+        )}
+        <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+          <span style={{ color:T.dim, fontSize:14 }}>$</span>
+          <input type="number" inputMode="decimal" step="0.01" value={amountValue} onChange={e=>onAmountChange(e.target.value)}
+            style={{ ...fieldStyle, width:92, textAlign:'right' }} />
+          <span style={{ color:T.dim, fontSize:12 }}>/mo</span>
         </div>
-      )}
-      <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
-        <span style={{ color:T.dim, fontSize:14 }}>$</span>
-        <input type="number" step="0.01" value={amountValue} onChange={e=>onAmountChange(e.target.value)}
-          style={{ ...fieldStyle, width:90, textAlign:'right' }} />
-        <span style={{ color:T.dim, fontSize:12 }}>/mo</span>
+        <button onClick={onDelete} style={{ background:T.coralBg, color:T.coral, border:`1px solid ${T.coralMid}`, borderRadius:10, padding:'0 14px', fontSize:18, cursor:'pointer', fontWeight:700, flexShrink:0, alignSelf:'stretch' }} aria-label="Remove">×</button>
       </div>
-      <button onClick={onDelete} style={{ background:T.coralBg, color:T.coral, border:`1px solid ${T.coralMid}`, borderRadius:10, padding:'0 12px', fontSize:16, cursor:'pointer', fontWeight:700, flexShrink:0 }} aria-label="Remove">×</button>
     </div>
   );
 };
@@ -1760,6 +1786,7 @@ const PrepMode = ({ onExit }) => {
     const d = new Date(D.date + ' 12:00:00');
     return isNaN(d.getTime()) ? new Date().toISOString().slice(0,10) : d.toISOString().slice(0,10);
   });
+  const narrow = useIsNarrow();
   const [acct, setAcct] = useState({ ...D.accounts });
   const [sources, setSources] = useState(D.income.sources.map((s,i) => ({ ...s, _id: i })));
   const [bills, setBills] = useState((D.fixedBillsList || []).map((b,i) => ({ ...b, _id: b.id || `b_${i}_${Date.now()}` })));
@@ -1830,6 +1857,7 @@ const PrepMode = ({ onExit }) => {
         spending: spending.map(({ _id, ...rest }) => rest),
         grocery: { ...(D.grocery || {}), weekly: parseFloat(groceryWeekly) || 0 },
         cycle: D.cycle,
+        goals: D.goals,   // preserve goal progress (edited on the Goals screen, not here)
       };
 
       const notesToSave = clearNotes ? ['','','','',''] : upcomingNotes;
@@ -1875,11 +1903,11 @@ const PrepMode = ({ onExit }) => {
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', background:T.cream, overflow:'hidden' }}>
       {/* Header */}
-      <div style={{ background:'#fff', borderBottom:`1px solid ${T.border}`, padding:'14px 40px', display:'flex', alignItems:'center', gap:16, flexShrink:0 }}>
+      <div style={{ background:'#fff', borderBottom:`1px solid ${T.border}`, padding: narrow ? '12px 16px' : '14px 40px', display:'flex', alignItems:'center', gap: narrow ? 10 : 16, flexShrink:0 }}>
         <button onClick={onExit} style={{ background:'none', border:`1px solid ${T.border}`, borderRadius:100, padding:'7px 18px', fontSize:13, cursor:'pointer', color:T.dim, fontWeight:600 }}>← Back</button>
         <div>
-          <p style={{ fontWeight:800, fontSize:18 }}>🔧 Prep Mode</p>
-          <p style={{ fontSize:12, color:T.dim }}>Update data before your next money date session</p>
+          <p style={{ fontWeight:800, fontSize: narrow ? 16 : 18 }}>🔧 Prep Mode</p>
+          {!narrow && <p style={{ fontSize:12, color:T.dim }}>Update data before your next money date session</p>}
         </div>
         <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:12 }}>
           {saved && <span style={{ fontSize:13, color:T.green, fontWeight:700 }}>✓ Saved! Reloading…</span>}
@@ -1890,18 +1918,18 @@ const PrepMode = ({ onExit }) => {
       </div>
 
       {/* Tab bar */}
-      <div style={{ background:'#fff', borderBottom:`1px solid ${T.border}`, padding:'0 40px', display:'flex', gap:4, flexShrink:0 }}>
+      <div style={{ background:'#fff', borderBottom:`1px solid ${T.border}`, padding: narrow ? '0 8px' : '0 40px', display:'flex', gap:4, flexShrink:0, overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
         {PREP_TABS.map(t => (
           <button key={t.id} onClick={()=>setTab(t.id)} style={{
-            background:'none', border:'none', padding:'12px 16px', fontSize:13, fontWeight:700,
-            color: tab===t.id ? T.ink : T.dim, cursor:'pointer',
+            background:'none', border:'none', padding: narrow ? '12px 12px' : '12px 16px', fontSize:13, fontWeight:700,
+            color: tab===t.id ? T.ink : T.dim, cursor:'pointer', whiteSpace:'nowrap', flexShrink:0,
             borderBottom: `3px solid ${tab===t.id ? T.ink : 'transparent'}`, transition:'all .15s'
           }}>{t.label}</button>
         ))}
       </div>
 
       {/* Content */}
-      <div style={{ flex:1, overflowY:'auto', padding:'32px 40px', maxWidth:860, width:'100%', margin:'0 auto' }}>
+      <div style={{ flex:1, overflowY:'auto', padding: narrow ? '20px 16px' : '32px 40px', maxWidth:860, width:'100%', margin:'0 auto' }}>
 
         {/* BALANCES */}
         {tab==='balances' && (
@@ -1999,8 +2027,8 @@ const PrepMode = ({ onExit }) => {
             <p style={{ color:T.dim, fontSize:14, marginBottom:24 }}>Add, remove, or update any income source. The cash flow screen totals update automatically.</p>
             <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:16 }}>
               {sources.map(s => (
-                <Card key={s._id} style={{ padding:'16px 20px' }}>
-                  <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr', gap:12, marginBottom:10 }}>
+                <Card key={s._id} style={{ padding: narrow ? '14px 14px' : '16px 20px' }}>
+                  <div style={{ display:'grid', gridTemplateColumns: narrow ? '1fr' : '2fr 1fr 1fr', gap:12, marginBottom:10 }}>
                     <div>
                       <span style={labelStyle}>Source name</span>
                       <input value={s.label} onChange={e=>updateSource(s._id,'label',e.target.value)} style={fieldStyle} />
@@ -2009,7 +2037,7 @@ const PrepMode = ({ onExit }) => {
                       <span style={labelStyle}>Monthly amount</span>
                       <div style={{ display:'flex', alignItems:'center', gap:4 }}>
                         <span style={{ color:T.dim }}>$</span>
-                        <input type="number" value={s.amt} onChange={e=>updateSource(s._id,'amt',e.target.value)} style={{ ...fieldStyle, textAlign:'right' }} />
+                        <input type="number" inputMode="decimal" value={s.amt} onChange={e=>updateSource(s._id,'amt',e.target.value)} style={{ ...fieldStyle, textAlign:'right' }} />
                       </div>
                     </div>
                     <div>
@@ -2017,20 +2045,20 @@ const PrepMode = ({ onExit }) => {
                       <input value={s.acct} onChange={e=>updateSource(s._id,'acct',e.target.value)} style={fieldStyle} />
                     </div>
                   </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:12 }}>
-                    <div style={{ flex:1 }}>
+                  <div style={{ display:'flex', flexWrap:'wrap', alignItems:'flex-end', gap:12 }}>
+                    <div style={{ flex:'1 1 120px', minWidth:110 }}>
                       <span style={labelStyle}>Timing label</span>
                       <input value={s.when||''} onChange={e=>updateSource(s._id,'when',e.target.value)} style={fieldStyle} placeholder="e.g. 15th" />
                     </div>
-                    <div style={{ width:84 }}>
+                    <div style={{ width:76 }}>
                       <span style={labelStyle}>Day</span>
-                      <input type="number" min="1" max="31" value={s.day ?? ''} onChange={e=>updateSource(s._id,'day',e.target.value)} style={{ ...fieldStyle, textAlign:'center' }} placeholder="—" />
+                      <input type="number" inputMode="numeric" min="1" max="31" value={s.day ?? ''} onChange={e=>updateSource(s._id,'day',e.target.value)} style={{ ...fieldStyle, textAlign:'center' }} placeholder="—" />
                     </div>
                     <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:T.dim, whiteSpace:'nowrap', paddingBottom:10 }} title="Lands in another account — available to allocate, not auto-added to Billing">
                       <input type="checkbox" checked={!!s.allocate} onChange={e=>updateSource(s._id,'allocate',e.target.checked)} />
                       allocate only
                     </label>
-                    <button onClick={()=>removeSource(s._id)} style={{ background:T.coralBg, color:T.coral, border:`1px solid ${T.coralMid}`, borderRadius:10, padding:'8px 14px', fontSize:13, cursor:'pointer', fontWeight:700, flexShrink:0 }}>Remove</button>
+                    <button onClick={()=>removeSource(s._id)} style={{ background:T.coralBg, color:T.coral, border:`1px solid ${T.coralMid}`, borderRadius:10, padding:'8px 14px', fontSize:13, cursor:'pointer', fontWeight:700, flexShrink:0, marginLeft:'auto' }}>Remove</button>
                   </div>
                 </Card>
               ))}
@@ -2296,30 +2324,51 @@ const PullToRefresh = ({ children, screenId }) => {
 };
 
 // ─── APP SHELL ────────────────────────────────────────────────────────────────
-// ─── CASH-FLOW ENGINE ────────────────────────────────────────────────────────
-// Walk the Billing account balance forward through the remaining days of the
-// month: income lands (+), fixed bills hit (−), weekly grocery transfers go out
-// (−). Returns the ordered events with a running balance, the low point, totals.
-const buildFlow = (D, asOfDay) => {
+// ─── MONEY-MOVEMENTS MODEL ───────────────────────────────────────────────────
+// Everything that moves cash is a "movement": income (+ to Billing), bill (− from
+// Billing, external), or transfer (− from Billing → one of our own accounts).
+// getMovements() unifies the (still legacy-stored) income/bills/transfers lists.
+const getMovements = (D) => {
+  const out = [];
+  (D.income?.sources || []).forEach((s, i) => {
+    if (s.allocate) return;                                              // lands elsewhere — not into Billing
+    if (!String(s.acct || '').toLowerCase().includes('billing')) return;
+    if (!(Number(s.amt) > 0)) return;
+    out.push({ id: 'inc' + i, kind: 'income', label: s.label, sub: s.when, amount: Number(s.amt), cadence: 'monthly', day: s.day, note: s.note });
+  });
+  (D.fixedBillsList || []).forEach(b => {
+    if (b.paused || b.day == null || !(Number(b.amount) > 0)) return;
+    out.push({ id: b.id, kind: 'bill', label: b.name, amount: -Number(b.amount), cadence: 'monthly', day: Number(b.day), note: b.note });
+  });
+  (D.transfers || []).forEach(t => {
+    if (t.paused || !(Number(t.amount) > 0)) return;
+    out.push({ id: t.id, kind: 'transfer', label: t.label, amount: -Number(t.amount), cadence: t.cadence || 'monthly', day: t.day, to: t.to, fund: t.fund, spendType: t.spendType, note: t.note });
+  });
+  return out;
+};
+
+// Expand one movement into the dated events it produces within [asOf, endDay].
+const expandMovement = (m, asOf, endDay) => {
+  if (m.cadence === 'weekly') {
+    const anchor = Number(m.day) || 2;
+    const evs = [];
+    for (let d = anchor; d <= endDay; d += 7) if (d >= asOf) evs.push({ ...m, day: d });
+    return evs;
+  }
+  // monthly or one-off: a single dated event
+  const d = Number(m.day);
+  return (m.day != null && d >= asOf && d <= endDay) ? [{ ...m, day: d }] : [];
+};
+
+// Walk the Billing balance forward from today through end of the cycle.
+const buildProjection = (D, asOfDay) => {
   const endDay = D.cycle?.endDay || 30;
   const start = Number(D.accounts?.billing) || 0;
 
-  const bills = (D.fixedBillsList || [])
-    .filter(b => !b.paused && b.day != null && Number(b.amount) > 0)
-    .map(b => ({ day: Number(b.day), label: b.name, amount: -Number(b.amount), kind: 'bill', note: b.note }));
-
-  const income = (D.income?.sources || [])
-    .filter(s => !s.allocate && s.day != null && Number(s.amt) > 0 && String(s.acct || '').toLowerCase().includes('billing'))
-    .map(s => ({ day: Number(s.day), label: s.label + (s.when ? ` (${s.when})` : ''), amount: Number(s.amt), kind: 'income', note: s.note }));
-
-  const gw = Number(D.grocery?.weekly) || 0;
-  const weeks = (D.grocery?.weeks || []).filter(d => d != null).map(Number);
-  const grocery = gw > 0 ? weeks.map(d => ({ day: d, label: 'Grocery transfer', amount: -gw, kind: 'grocery' })) : [];
-
-  // Only events still to come (on/after today). Within a day, outflows first (worst case).
-  const events = [...income, ...bills, ...grocery]
-    .filter(e => e.day >= asOfDay && e.day <= endDay)
-    .sort((a, b) => a.day - b.day || a.amount - b.amount);
+  const events = [];
+  getMovements(D).forEach(m => expandMovement(m, asOfDay, endDay).forEach(e => events.push(e)));
+  // Within a day, outflows before income (worst case) so the low point is honest.
+  events.sort((a, b) => a.day - b.day || a.amount - b.amount);
 
   let bal = start;
   let low = { balance: start, day: asOfDay, label: 'Starting balance' };
@@ -2330,12 +2379,60 @@ const buildFlow = (D, asOfDay) => {
     return row;
   });
 
-  const incomeTotal  = walk.filter(e => e.kind === 'income').reduce((s, e) => s + e.amount, 0);
-  const billTotal    = walk.filter(e => e.kind === 'bill').reduce((s, e) => s + e.amount, 0);
-  const groceryTotal = walk.filter(e => e.kind === 'grocery').reduce((s, e) => s + e.amount, 0);
-  const allocatable  = (D.income?.sources || []).filter(s => s.allocate).reduce((s, x) => s + (Number(x.amt) || 0), 0);
+  const sumKind = k => walk.filter(e => e.kind === k).reduce((s, e) => s + e.amount, 0);
+  const incomeTotal   = sumKind('income');
+  const billTotal     = sumKind('bill');
+  const transferTotal = sumKind('transfer');
+  const allocatable   = (D.income?.sources || []).filter(s => s.allocate).reduce((s, x) => s + (Number(x.amt) || 0), 0);
 
-  return { start, end: bal, walk, low, incomeTotal, billTotal, groceryTotal, allocatable, asOfDay, endDay };
+  return { start, end: bal, walk, low, incomeTotal, billTotal, transferTotal, groceryTotal: transferTotal, allocatable, asOfDay, endDay };
+};
+
+// Months from today until an ISO due date (rounded, min 0).
+const monthsUntil = (dueISO) => {
+  if (!dueISO) return null;
+  const now = new Date();
+  const due = new Date(dueISO + (dueISO.length <= 10 ? 'T12:00:00' : ''));
+  if (isNaN(due.getTime())) return null;
+  return Math.max(0, Math.round((due - now) / (1000 * 60 * 60 * 24 * 30.44)));
+};
+
+// Is a sinking fund on track to hit its target by its due date?
+// Projected = current account balance + (monthly transfer × months left).
+const fundStatus = (D, t) => {
+  if (!t.fund || !(Number(t.fund.target) > 0)) return null;
+  const bal = Number(D.accounts?.[t.to]) || 0;
+  const monthly = t.cadence === 'weekly' ? (Number(t.amount) || 0) * 4.33 : (Number(t.amount) || 0);
+  const months = monthsUntil(t.fund.dueDate);
+  const projected = months == null ? bal : Math.round((bal + monthly * months) * 100) / 100;
+  const target = Number(t.fund.target);
+  const onTrack = projected >= target;
+  const pct = target > 0 ? Math.min(100, Math.round((bal / target) * 100)) : 0;
+  return { bal, monthly, months, projected, target, onTrack, pct, dated: !!t.fund.dueDate, shortfall: Math.max(0, Math.round((target - projected) * 100) / 100) };
+};
+
+// Live-save: merge a patch into the in-memory D and upsert the whole budget blob.
+// Used by the editable screens so changes persist immediately (no separate "apply").
+const LIQUID_KEYS = ['billing','groceries','propertyTax','emergency','baselane','opFunSavings','personalClearing'];
+const recomputeTotals = (accounts) => {
+  const liquid = LIQUID_KEYS.reduce((s,k)=> s + (Number(accounts[k])||0), 0);
+  const debt = (Number(accounts.sapphire)||0) + (Number(accounts.ink)||0) + (Number(accounts.apple)||0);
+  return { ...accounts, totalLiquid: Math.round(liquid*100)/100, totalDebt: Math.round(debt*100)/100, netCash: Math.round((liquid-debt)*100)/100 };
+};
+const saveBudget = (patch) => {
+  Object.assign(D, patch);
+  if (D.fixedBillsList) D.fixedBills = Math.round(D.fixedBillsList.reduce((s,b)=> s + (Number(b.amount)||0), 0));
+  return db.saveBudgetData({
+    date:D.date, cycle:D.cycle, accounts:D.accounts, income:D.income, grocery:D.grocery,
+    transfers:D.transfers, fixedBills:D.fixedBills, fixedBillsList:D.fixedBillsList,
+    variableSpend:D.variableSpend, deficit:D.deficit, spending:D.spending, goals:D.goals,
+  }).catch(e => console.error('saveBudget failed:', e));
+};
+// Debounce a function by `ms` (module-level, per-key timers).
+const _debTimers = {};
+const debouncedSave = (key, patch, ms = 600) => {
+  clearTimeout(_debTimers[key]);
+  _debTimers[key] = setTimeout(() => saveBudget(patch), ms);
 };
 
 // Accounts a float transfer could come from, largest balance first.
@@ -2379,10 +2476,10 @@ const BalanceChart = ({ flow }) => {
 };
 
 // ─── SCREEN: CASH FLOW TIMELINE (This Month) ─────────────────────────────────
-const CashFlowTimeline = ({ onPrep }) => {
+const CashFlowTimeline = ({ onGo }) => {
   const today = new Date();
   const [asOfDay, setAsOfDay] = useState(() => Math.min(today.getDate(), D.cycle?.endDay || 30));
-  const flow = buildFlow(D, asOfDay);
+  const flow = buildProjection(D, asOfDay);
   const covered = flow.low.balance >= 0;
   const shortfall = covered ? 0 : Math.ceil((-flow.low.balance) / 50) * 50;
   const sources = floatSources(D);
@@ -2391,8 +2488,8 @@ const CashFlowTimeline = ({ onPrep }) => {
   const ccDebt = Number(D.accounts?.totalDebt) || 0;
   const heloc = Number(D.accounts?.heloc) || 0;
 
-  const kindColor = { income: T.green, bill: T.ink, grocery: T.amber };
-  const kindIcon  = { income: '💵', bill: '🧾', grocery: '🛒' };
+  const kindColor = { income: T.green, bill: T.ink, transfer: T.amber };
+  const kindIcon  = { income: '💵', bill: '🧾', transfer: '🔁' };
 
   const Tile = ({ label, value, color, sub }) => (
     <div style={{ background: T.card, border:`1px solid ${T.border}`, borderRadius: 14, padding:'14px 16px', flex:'1 1 150px', minWidth: 140 }}>
@@ -2407,7 +2504,7 @@ const CashFlowTimeline = ({ onPrep }) => {
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12, flexWrap:'wrap', marginBottom: 20 }}>
         <SectionHeader tag={`${monthLabel} · the need-to-know`} tagColor={covered ? 'green' : 'red'}
           title="Will Billing cover it?" sub="Your checking balance, walked forward through every paycheck, bill, and grocery transfer left this month." />
-        <button onClick={onPrep} style={{ background: T.ink, color:'#fff', border:'none', borderRadius:100, padding:'9px 18px', fontSize:13, fontWeight:700, cursor:'pointer', flexShrink:0, marginTop:4 }}>🔧 Update numbers</button>
+        <button onClick={()=>onGo('today')} style={{ background: T.ink, color:'#fff', border:'none', borderRadius:100, padding:'9px 18px', fontSize:13, fontWeight:700, cursor:'pointer', flexShrink:0, marginTop:4 }}>🔧 Update balances</button>
       </div>
 
       {/* VERDICT */}
@@ -2464,7 +2561,7 @@ const CashFlowTimeline = ({ onPrep }) => {
         <Tile label="Billing now" value={$$(flow.start)} color={flow.start < 200 ? T.coral : T.ink} sub={`as of ${dayLabel(asOfDay)}`} />
         <Tile label="Still coming in" value={`+${$(flow.incomeTotal)}`} color={T.green} sub="paychecks left" />
         <Tile label="Bills still due" value={$(flow.billTotal)} color={T.ink} sub="from Billing" />
-        <Tile label="Grocery transfers" value={$(flow.groceryTotal)} color={T.amber} sub="weekly envelope" />
+        <Tile label="Transfers out" value={$(flow.transferTotal)} color={T.amber} sub="to savings / envelope" />
         <Tile label="Projected end" value={$$(flow.end)} color={flow.end < 0 ? T.coral : T.green} sub={dayLabel(flow.endDay)} />
       </div>
 
@@ -2512,17 +2609,598 @@ const CashFlowTimeline = ({ onPrep }) => {
   );
 };
 
+// ─── SCREEN: GOALS & PROGRESS ────────────────────────────────────────────────
+// Phase B: turn the monthly surplus into funded goals, and track + celebrate
+// progress over time. Goals + contribution history live in budget_data (no
+// schema change); saved = running total, contributions = timestamped log.
+const GOAL_ICONS = ['🛡️','🍳','🏠','🚗','✈️','👶','💍','🎓','🏖️','💰','🎯','❤️'];
+
+const GoalsProgress = ({ onGo }) => {
+  const [goals, setGoals] = useState(() => (D.goals || []).map((g, i) => ({
+    _id: g.id || `g_${i}`, icon: g.icon || '🎯', name: g.name || 'Goal',
+    target: Number(g.target) || 0, saved: Number(g.saved) || 0, note: g.note || '',
+    contributions: Array.isArray(g.contributions) ? g.contributions : [],
+  })));
+  const [amt, setAmt] = useState({});
+  const [toast, setToast] = useState(null);
+  const [editId, setEditId] = useState(null);
+  const [adding, setAdding] = useState(false);
+  const [newGoal, setNewGoal] = useState({ name:'', target:'', icon:'🎯' });
+  const [accts, setAccts] = useState(() => ({ ...D.accounts }));
+  const [payAmt, setPayAmt] = useState({});
+
+  const DEBTS = [['sapphire','Chase Sapphire','💳'],['ink','Chase Ink','💳'],['apple','Apple Card','🍎'],['heloc','HELOC','🏠']];
+  const payDebt = (k, label) => {
+    const v = parseFloat(payAmt[k]); if (!v || v <= 0) return;
+    const cur = Number(accts[k]) || 0;
+    const next = { ...accts, [k]: Math.max(0, Math.round((cur - v) * 100) / 100) };
+    setAccts(next);
+    saveBudget({ accounts: recomputeTotals(next) });
+    setPayAmt(a => ({ ...a, [k]: '' }));
+    setToast(`💳 ${$(v)} paid toward ${label} — now ${$(next[k])}`);
+    setTimeout(() => setToast(null), 2800);
+  };
+  const totalDebtNow = DEBTS.reduce((s,[k]) => s + (Number(accts[k]) || 0), 0);
+
+  const persist = (next) => {
+    setGoals(next);
+    const forSave = next.map(({ _id, ...g }) => ({ ...g, id: _id }));
+    D.goals = forSave;
+    db.saveBudgetData({
+      date: D.date, cycle: D.cycle, accounts: D.accounts, income: D.income,
+      grocery: D.grocery, fixedBills: D.fixedBills, fixedBillsList: D.fixedBillsList,
+      variableSpend: D.variableSpend, deficit: D.deficit, spending: D.spending,
+      goals: forSave,
+    }).catch(err => console.error('saveGoals failed:', err));
+  };
+
+  const now = new Date();
+  const inThisMonth = (iso) => { const d = new Date(iso); return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear(); };
+
+  const totalSaved = goals.reduce((s,g)=>s+g.saved,0);
+  const totalTarget = goals.reduce((s,g)=>s+g.target,0);
+  const allocatedThisMonth = goals.reduce((s,g)=> s + g.contributions.filter(c=>inThisMonth(c.date)).reduce((t,c)=>t+(Number(c.amount)||0),0), 0);
+  const monthlySurplus = (typeof D.deficit === 'number') ? D.deficit : ((D.income?.total||0) - (D.fixedBills||0) - (D.variableSpend||0));
+  const remainingToAllocate = Math.round((monthlySurplus - allocatedThisMonth)*100)/100;
+
+  const contribute = (id) => {
+    const v = parseFloat(amt[id]); if (!v || v <= 0) return;
+    const next = goals.map(g => g._id===id
+      ? { ...g, saved: Math.round((g.saved+v)*100)/100, contributions: [...g.contributions, { date: new Date().toISOString(), amount: v }] }
+      : g);
+    const g = next.find(x=>x._id===id);
+    persist(next);
+    setAmt(a => ({ ...a, [id]: '' }));
+    setToast(`🎉 ${$(v)} toward ${g.name}` + (g.target>0 && g.saved>=g.target ? ' — goal reached! 🥳' : ''));
+    setTimeout(()=>setToast(null), 2800);
+  };
+  const undoLast = (id) => persist(goals.map(g => {
+    if (g._id!==id || !g.contributions.length) return g;
+    const last = g.contributions[g.contributions.length-1];
+    return { ...g, saved: Math.round((g.saved-(Number(last.amount)||0))*100)/100, contributions: g.contributions.slice(0,-1) };
+  }));
+  const updateGoal = (id, k, v) => persist(goals.map(g => g._id===id ? { ...g, [k]: (k==='target'||k==='saved') ? (parseFloat(v)||0) : v } : g));
+  const deleteGoal = (id) => persist(goals.filter(g => g._id!==id));
+  const addGoal = () => {
+    if (!newGoal.name.trim()) return;
+    persist([...goals, { _id:`g_${Date.now()}`, icon:newGoal.icon||'🎯', name:newGoal.name.trim(), target:parseFloat(newGoal.target)||0, saved:0, note:'', contributions:[] }]);
+    setNewGoal({ name:'', target:'', icon:'🎯' }); setAdding(false);
+  };
+
+  const recent = goals.flatMap(g => g.contributions.map(c => ({ ...c, goal:g.name, icon:g.icon })))
+    .sort((a,b)=> new Date(b.date)-new Date(a.date)).slice(0,6);
+  const fmtDate = (iso) => { try { return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric'}); } catch { return ''; } };
+  const overallPct = totalTarget>0 ? Math.min(100, Math.round((totalSaved/totalTarget)*100)) : 0;
+
+  const field = { border:`1px solid ${T.border}`, borderRadius:10, padding:'8px 12px', fontSize:14, fontFamily:'inherit', outline:'none', background:'#fff', color:T.ink };
+
+  return (
+    <div style={{ padding:'clamp(20px,5vw,32px) clamp(16px,5vw,48px)', maxWidth: 920, margin:'0 auto' }}>
+      {toast && (
+        <div style={{ position:'fixed', top:18, left:'50%', transform:'translateX(-50%)', background:T.green, color:'#fff', padding:'10px 20px', borderRadius:100, fontSize:14, fontWeight:700, boxShadow:'0 6px 24px rgba(0,0,0,0.18)', zIndex:2000 }}>{toast}</div>
+      )}
+
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12, flexWrap:'wrap', marginBottom: 20 }}>
+        <SectionHeader tag="Surplus → Progress" tagColor={monthlySurplus>=0?'green':'amber'}
+          title="Allocate" sub="Put any surplus to work — savings goals, one-off plans (Christmas), or paying down debt." />
+        <button onClick={()=>onGo('incomebills')} style={{ background: T.ink, color:'#fff', border:'none', borderRadius:100, padding:'9px 18px', fontSize:13, fontWeight:700, cursor:'pointer', flexShrink:0, marginTop:4 }}>🔧 Income &amp; bills</button>
+      </div>
+
+      {/* SURPLUS */}
+      <Card style={{
+        background: monthlySurplus>=0 ? 'linear-gradient(135deg,#173528 0%,#265842 100%)' : T.amberBg,
+        border: monthlySurplus>=0 ? 'none' : `1px solid ${T.amberMid}`, color: monthlySurplus>=0 ? '#fff' : T.ink,
+        padding:'26px 24px', marginBottom: 16
+      }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', flexWrap:'wrap', gap:12 }}>
+          <div>
+            <p style={{ fontSize: 12, letterSpacing:1.2, textTransform:'uppercase', opacity: monthlySurplus>=0?.65:1, color: monthlySurplus>=0?'#fff':T.amber, fontWeight:700, marginBottom:6 }}>
+              {monthlySurplus>=0 ? 'Monthly surplus to put to work' : 'The plan runs short right now'}
+            </p>
+            <p style={{ fontSize:'clamp(34px,8vw,52px)', fontWeight:800, letterSpacing:-1.5, lineHeight:1, color: monthlySurplus>=0?'#fff':T.coral }}>
+              {monthlySurplus>=0 ? '' : '−'}{$(Math.abs(monthlySurplus))}<span style={{ fontSize:18, fontWeight:600, opacity:.6 }}>/mo</span>
+            </p>
+          </div>
+          <div style={{ textAlign:'right' }}>
+            <p style={{ fontSize:12, opacity:.7 }}>Put toward goals this month</p>
+            <p style={{ fontSize:24, fontWeight:800 }}>{$(allocatedThisMonth)}</p>
+            {monthlySurplus>0 && <p style={{ fontSize:12, opacity:.75, marginTop:2 }}>{remainingToAllocate>0 ? `${$(remainingToAllocate)} still free to allocate` : 'Fully allocated 🎉'}</p>}
+          </div>
+        </div>
+        <p style={{ fontSize:13, marginTop:14, opacity: monthlySurplus>=0?.8:1, lineHeight:1.6 }}>
+          {monthlySurplus>=0
+            ? 'Income minus fixed bills and variable spending, if the month goes to plan. Make sure This Month shows Billing covered before moving cash to savings.'
+            : 'Covering the month comes first — see This Month. On any surplus month, send the extra here.'}
+        </p>
+      </Card>
+
+      {/* OVERALL PROGRESS */}
+      <Card style={{ marginBottom: 16 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+          <p style={{ fontWeight:700 }}>Total saved toward goals</p>
+          <p style={{ fontSize:20, fontWeight:800, color:T.green }}>{$(totalSaved)} <span style={{ fontSize:13, color:T.dim, fontWeight:600 }}>of {$(totalTarget)}</span></p>
+        </div>
+        <Bar val={totalSaved} max={totalTarget||1} color={T.green} h={12} />
+        <p style={{ fontSize:12, color:T.dim, marginTop:6 }}>{overallPct}% of the way there across {goals.length} goal{goals.length!==1?'s':''}.</p>
+      </Card>
+
+      {/* GOAL CARDS */}
+      <div style={{ display:'flex', flexDirection:'column', gap:12, marginBottom:16 }}>
+        {goals.map(g => {
+          const pct = g.target>0 ? Math.min(100, Math.round((g.saved/g.target)*100)) : 0;
+          const done = g.target>0 && g.saved>=g.target;
+          const remaining = Math.max(0, g.target - g.saved);
+          const editing = editId===g._id;
+          return (
+            <Card key={g._id} style={{ border:`1px solid ${done?T.greenMid:T.border}`, background: done?T.greenBg:T.card }}>
+              <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:10 }}>
+                <span style={{ fontSize:26 }}>{g.icon}</span>
+                <div style={{ flex:1, minWidth:0 }}>
+                  {editing
+                    ? <input value={g.name} onChange={e=>updateGoal(g._id,'name',e.target.value)} style={{ ...field, width:'100%', fontWeight:700 }} />
+                    : <p style={{ fontWeight:800, fontSize:16 }}>{g.name} {done && <span style={{ color:T.green }}>🎉</span>}</p>}
+                  {!editing && (g.note || g.dueDate) && <p style={{ fontSize:12, color:T.dim }}>{g.note}{g.note&&g.dueDate?' · ':''}{g.dueDate ? `🗓 by ${(()=>{try{return new Date(g.dueDate+'T12:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'});}catch{return g.dueDate;}})()}` : ''}</p>}
+                </div>
+                <div style={{ textAlign:'right', flexShrink:0 }}>
+                  <p style={{ fontWeight:800, fontSize:16, color: done?T.green:T.ink }}>{$(g.saved)}</p>
+                  <p style={{ fontSize:11, color:T.dim }}>of {editing ? '' : $(g.target)}
+                    {editing && <input type="number" value={g.target} onChange={e=>updateGoal(g._id,'target',e.target.value)} style={{ ...field, width:90, padding:'4px 8px', textAlign:'right' }} />}
+                  </p>
+                </div>
+              </div>
+
+              <Bar val={g.saved} max={g.target||1} color={done?T.green:T.purple} h={10} />
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:T.dim, marginTop:5 }}>
+                <span>{pct}%{!done && remaining>0 ? ` · ${$(remaining)} to go` : ''}</span>
+                <span>{g.contributions.length} contribution{g.contributions.length!==1?'s':''}</span>
+              </div>
+
+              {!editing && (
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:12, flexWrap:'wrap' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                    <span style={{ color:T.dim, fontSize:14 }}>$</span>
+                    <input type="number" inputMode="decimal" placeholder="amount" value={amt[g._id]||''}
+                      onChange={e=>setAmt(a=>({ ...a, [g._id]: e.target.value }))}
+                      onKeyDown={e=>e.key==='Enter'&&contribute(g._id)}
+                      style={{ ...field, width:110, textAlign:'right' }} />
+                  </div>
+                  <button onClick={()=>contribute(g._id)} style={{ background:T.green, color:'#fff', border:'none', borderRadius:10, padding:'9px 18px', fontSize:14, fontWeight:700, cursor:'pointer' }}>+ Add contribution</button>
+                  {[100,250,500].map(q => (
+                    <button key={q} onClick={()=>setAmt(a=>({ ...a, [g._id]: String((parseFloat(a[g._id])||0)+q) }))}
+                      style={{ background:T.card, color:T.dim, border:`1px solid ${T.border}`, borderRadius:100, padding:'6px 12px', fontSize:12, fontWeight:700, cursor:'pointer' }}>+{q}</button>
+                  ))}
+                  {g.contributions.length>0 && <button onClick={()=>undoLast(g._id)} style={{ marginLeft:'auto', background:'none', border:'none', color:T.dim, fontSize:12, cursor:'pointer', textDecoration:'underline' }}>undo last</button>}
+                  <button onClick={()=>setEditId(g._id)} style={{ background:'none', border:'none', color:T.dim, fontSize:13, cursor:'pointer' }}>✏️</button>
+                </div>
+              )}
+              {editing && (
+                <div style={{ display:'flex', flexDirection:'column', gap:10, marginTop:12 }}>
+                  <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+                    <span style={{ fontSize:12, color:T.dim }}>Icon</span>
+                    {GOAL_ICONS.map(ic => (
+                      <button key={ic} onClick={()=>updateGoal(g._id,'icon',ic)} style={{ background: g.icon===ic?T.greenBg:'transparent', border:`1px solid ${g.icon===ic?T.greenMid:T.border}`, borderRadius:8, padding:'3px 6px', fontSize:16, cursor:'pointer' }}>{ic}</button>
+                    ))}
+                  </div>
+                  <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
+                    <span style={{ fontSize:12, color:T.dim }}>Target date (one-offs)</span>
+                    <input type="date" value={g.dueDate || ''} onChange={e=>updateGoal(g._id,'dueDate', e.target.value||undefined)} style={{ ...field, padding:'6px 10px' }} />
+                    <button onClick={()=>deleteGoal(g._id)} style={{ background:T.coralBg, color:T.coral, border:`1px solid ${T.coralMid}`, borderRadius:10, padding:'7px 14px', fontSize:13, fontWeight:700, cursor:'pointer' }}>Delete</button>
+                    <button onClick={()=>setEditId(null)} style={{ marginLeft:'auto', background:T.ink, color:'#fff', border:'none', borderRadius:10, padding:'7px 16px', fontSize:13, fontWeight:700, cursor:'pointer' }}>Done</button>
+                  </div>
+                </div>
+              )}
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* ADD GOAL */}
+      {adding ? (
+        <Card style={{ marginBottom:16 }}>
+          <p style={{ fontWeight:700, marginBottom:10 }}>New goal</p>
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center', marginBottom:10 }}>
+            <input placeholder="Goal name" value={newGoal.name} onChange={e=>setNewGoal(n=>({ ...n, name:e.target.value }))} style={{ ...field, flex:'1 1 160px' }} />
+            <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+              <span style={{ color:T.dim }}>$</span>
+              <input type="number" placeholder="target" value={newGoal.target} onChange={e=>setNewGoal(n=>({ ...n, target:e.target.value }))} style={{ ...field, width:120, textAlign:'right' }} />
+            </div>
+          </div>
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center', marginBottom:12 }}>
+            {GOAL_ICONS.map(ic => (
+              <button key={ic} onClick={()=>setNewGoal(n=>({ ...n, icon:ic }))} style={{ background: newGoal.icon===ic?T.greenBg:'transparent', border:`1px solid ${newGoal.icon===ic?T.greenMid:T.border}`, borderRadius:8, padding:'3px 7px', fontSize:17, cursor:'pointer' }}>{ic}</button>
+            ))}
+          </div>
+          <div style={{ display:'flex', gap:8 }}>
+            <button onClick={addGoal} style={{ background:T.green, color:'#fff', border:'none', borderRadius:10, padding:'9px 20px', fontSize:14, fontWeight:700, cursor:'pointer' }}>Add goal</button>
+            <button onClick={()=>{ setAdding(false); setNewGoal({ name:'', target:'', icon:'🎯' }); }} style={{ background:'none', border:`1px solid ${T.border}`, borderRadius:10, padding:'9px 18px', fontSize:14, cursor:'pointer', color:T.dim }}>Cancel</button>
+          </div>
+        </Card>
+      ) : (
+        <button onClick={()=>setAdding(true)} style={{ background:T.greenBg, color:T.green, border:`1px solid ${T.greenMid}`, borderRadius:12, padding:'11px 20px', fontSize:14, fontWeight:700, cursor:'pointer', marginBottom:16 }}>+ Add a goal</button>
+      )}
+
+      {/* DEBT PAYDOWN */}
+      <p style={{ fontSize:12, fontWeight:800, letterSpacing:1, textTransform:'uppercase', color:T.dim, margin:'22px 0 10px' }}>Pay down debt</p>
+      <Card style={{ marginBottom:16 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+          <span style={{ fontWeight:700 }}>Total owed</span>
+          <span style={{ fontSize:20, fontWeight:800, color:T.coral }}>−{$(totalDebtNow)}</span>
+        </div>
+        {DEBTS.map(([k,label,icon]) => {
+          const bal = Number(accts[k]) || 0;
+          return (
+            <div key={k} style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 0', borderTop:`1px solid ${T.border}`, flexWrap:'wrap' }}>
+              <span style={{ fontSize:16 }}>{icon}</span>
+              <div style={{ flex:'1 1 120px', minWidth:0 }}>
+                <p style={{ fontSize:14, fontWeight:600 }}>{label}</p>
+                <p style={{ fontSize:12, color: bal>0?T.coral:T.green }}>{bal>0 ? `${$$(bal)} owed` : 'Paid off 🎉'}</p>
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                <span style={{ color:T.dim, fontSize:14 }}>$</span>
+                <input type="number" inputMode="decimal" placeholder="pay" value={payAmt[k]||''}
+                  onChange={e=>setPayAmt(a=>({ ...a, [k]: e.target.value }))}
+                  onKeyDown={e=>e.key==='Enter'&&payDebt(k,label)}
+                  style={{ ...field, width:84, textAlign:'right' }} />
+              </div>
+              <button onClick={()=>payDebt(k,label)} disabled={bal<=0} style={{ background: bal>0?T.ink:T.border, color:'#fff', border:'none', borderRadius:10, padding:'8px 14px', fontSize:13, fontWeight:700, cursor: bal>0?'pointer':'default' }}>Pay</button>
+            </div>
+          );
+        })}
+      </Card>
+
+      {/* RECENT ACTIVITY */}
+      {recent.length>0 && (
+        <Card>
+          <p style={{ fontWeight:700, marginBottom:10 }}>Recent progress 🎉</p>
+          {recent.map((c,i) => (
+            <div key={i} style={{ display:'flex', alignItems:'center', gap:10, padding:'7px 0', borderBottom:`1px solid ${T.border}` }}>
+              <span style={{ fontSize:16 }}>{c.icon}</span>
+              <span style={{ flex:1, fontSize:13 }}>{c.goal}</span>
+              <span style={{ fontSize:12, color:T.dim }}>{fmtDate(c.date)}</span>
+              <span style={{ fontSize:13, fontWeight:700, color:T.green, width:80, textAlign:'right' }}>+{$(Number(c.amount)||0)}</span>
+            </div>
+          ))}
+        </Card>
+      )}
+    </div>
+  );
+};
+
+// ─── SCREEN: TRANSFERS ───────────────────────────────────────────────────────
+// Money moved between our own accounts. Three lenses on one list:
+//  • sinking funds (fund.dueDate) — on track to hit a dated target?
+//  • savings goals (fund, no dueDate) — progress toward a target
+//  • monthly spend transfers (no fund) — e.g. the weekly grocery envelope
+const TRANSFER_ACCTS = [['groceries','Groceries'],['propertyTax','Property Tax'],['emergency','E-Save'],['opFunSavings','Fun Savings'],['baselane','Baselane'],['personalClearing','Personal Clearing']];
+
+const Transfers = ({ onGo }) => {
+  const narrow = useIsNarrow();
+  const [transfers, setTransfers] = useState(() => (D.transfers || []).map((t,i)=>({ ...t, _id: t.id || `t_${i}` })));
+  const [editId, setEditId] = useState(null);
+
+  const persist = (next) => {
+    setTransfers(next);
+    const forSave = next.map(({ _id, ...t }) => ({ ...t, id: _id }));
+    D.transfers = forSave;
+    db.saveBudgetData({
+      date:D.date, cycle:D.cycle, accounts:D.accounts, income:D.income, grocery:D.grocery,
+      fixedBills:D.fixedBills, fixedBillsList:D.fixedBillsList, variableSpend:D.variableSpend,
+      deficit:D.deficit, spending:D.spending, goals:D.goals, transfers:forSave,
+    }).catch(e=>console.error('saveTransfers failed:', e));
+  };
+  const upd = (id, patch) => persist(transfers.map(t => t._id===id ? { ...t, ...patch } : t));
+  const updFund = (id, patch) => persist(transfers.map(t => t._id===id ? { ...t, fund: { ...(t.fund||{}), ...patch } } : t));
+  const del = (id) => persist(transfers.filter(t => t._id!==id));
+  const addT = (withFund) => { const id=`t_${Date.now()}`; persist([...transfers, { _id:id, label: withFund?'New savings goal':'New transfer', amount:0, to:'emergency', cadence:'monthly', day:1, ...(withFund?{fund:{target:0}}:{}) }]); setEditId(id); };
+
+  const acctLabel = k => (TRANSFER_ACCTS.find(a=>a[0]===k)||[null,k])[1];
+  const fmtMonth = (iso) => { try { return new Date(iso+'T12:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'}); } catch { return iso; } };
+  const monthlyOut = transfers.filter(t=>!t.paused).reduce((s,t)=> s + (t.cadence==='weekly' ? (Number(t.amount)||0)*4.33 : (Number(t.amount)||0)), 0);
+
+  const funds = transfers.filter(t => t.fund);
+  const plain = transfers.filter(t => !t.fund);
+
+  const field = { border:`1px solid ${T.border}`, borderRadius:10, padding:'8px 12px', fontSize:14, fontFamily:'inherit', outline:'none', background:'#fff', color:T.ink, width:'100%' };
+
+  const AmountRow = ({ t }) => (
+    <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+      <span style={{ color:T.dim, fontSize:14 }}>$</span>
+      <input type="number" inputMode="decimal" value={t.amount} onChange={e=>upd(t._id,{ amount: parseFloat(e.target.value)||0 })} style={{ ...field, width:92, textAlign:'right' }} />
+      <span style={{ color:T.dim, fontSize:12 }}>/{t.cadence==='weekly'?'wk':'mo'}</span>
+    </div>
+  );
+
+  const Editor = ({ t }) => (
+    <div style={{ marginTop:12, paddingTop:12, borderTop:`1px solid ${T.border}`, display:'flex', flexDirection:'column', gap:10 }}>
+      <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+        <div style={{ flex:'1 1 150px' }}><span style={{ fontSize:11, color:T.dim, fontWeight:700 }}>Label</span>
+          <input value={t.label} onChange={e=>upd(t._id,{label:e.target.value})} style={field} /></div>
+        <div style={{ width:140 }}><span style={{ fontSize:11, color:T.dim, fontWeight:700 }}>To account</span>
+          <select value={t.to} onChange={e=>upd(t._id,{to:e.target.value})} style={{ ...field, padding:'8px 8px' }}>
+            {TRANSFER_ACCTS.map(([k,l])=><option key={k} value={k}>{l}</option>)}
+          </select></div>
+      </div>
+      <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'flex-end' }}>
+        <div style={{ width:120 }}><span style={{ fontSize:11, color:T.dim, fontWeight:700 }}>Cadence</span>
+          <select value={t.cadence} onChange={e=>upd(t._id,{cadence:e.target.value})} style={{ ...field, padding:'8px 8px' }}>
+            <option value="monthly">Monthly</option><option value="weekly">Weekly</option>
+          </select></div>
+        <div style={{ width:90 }}><span style={{ fontSize:11, color:T.dim, fontWeight:700 }}>{t.cadence==='weekly'?'1st day':'Day'}</span>
+          <input type="number" inputMode="numeric" min="1" max="31" value={t.day ?? ''} onChange={e=>upd(t._id,{day: e.target.value===''?null:Math.max(1,Math.min(31,parseInt(e.target.value)||1))})} style={{ ...field, textAlign:'center' }} /></div>
+        {t.fund && (<>
+          <div style={{ width:120 }}><span style={{ fontSize:11, color:T.dim, fontWeight:700 }}>Target $</span>
+            <input type="number" inputMode="decimal" value={t.fund.target ?? ''} onChange={e=>updFund(t._id,{target:parseFloat(e.target.value)||0})} style={{ ...field, textAlign:'right' }} /></div>
+          <div style={{ width:160 }}><span style={{ fontSize:11, color:T.dim, fontWeight:700 }}>Due date (optional)</span>
+            <input type="date" value={t.fund.dueDate || ''} onChange={e=>updFund(t._id,{dueDate:e.target.value||undefined})} style={{ ...field }} /></div>
+        </>)}
+      </div>
+      <div style={{ display:'flex', gap:8 }}>
+        {!t.fund && <button onClick={()=>updFund(t._id,{target:0})} style={{ background:T.greenBg, color:T.green, border:`1px solid ${T.greenMid}`, borderRadius:10, padding:'7px 14px', fontSize:13, fontWeight:700, cursor:'pointer' }}>+ Make it a goal/fund</button>}
+        {t.fund && <button onClick={()=>upd(t._id,{fund:undefined})} style={{ background:'none', color:T.dim, border:`1px solid ${T.border}`, borderRadius:10, padding:'7px 14px', fontSize:13, cursor:'pointer' }}>Remove target</button>}
+        <button onClick={()=>del(t._id)} style={{ background:T.coralBg, color:T.coral, border:`1px solid ${T.coralMid}`, borderRadius:10, padding:'7px 14px', fontSize:13, fontWeight:700, cursor:'pointer' }}>Delete</button>
+        <button onClick={()=>setEditId(null)} style={{ marginLeft:'auto', background:T.ink, color:'#fff', border:'none', borderRadius:10, padding:'7px 16px', fontSize:13, fontWeight:700, cursor:'pointer' }}>Done</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ padding:'clamp(20px,5vw,32px) clamp(16px,5vw,48px)', maxWidth: 920, margin:'0 auto' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12, flexWrap:'wrap', marginBottom: 16 }}>
+        <SectionHeader tag="Between your accounts" tagColor="amber"
+          title="Transfers" sub="Money you move out of Billing into your own accounts — spending envelopes and savings you're building up." />
+      </div>
+      <Card style={{ background:T.amberBg, border:`1px solid ${T.amberMid}`, marginBottom:16 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <span style={{ fontWeight:700 }}>Moving out of Billing each month</span>
+          <span style={{ fontSize:24, fontWeight:800, color:T.amber }}>{$(Math.round(monthlyOut))}/mo</span>
+        </div>
+      </Card>
+
+      {/* SINKING FUNDS & SAVINGS */}
+      <p style={{ fontSize:12, fontWeight:800, letterSpacing:1, textTransform:'uppercase', color:T.dim, margin:'4px 0 10px' }}>Funds &amp; savings you're building</p>
+      <div style={{ display:'flex', flexDirection:'column', gap:12, marginBottom:16 }}>
+        {funds.length===0 && <Card><p style={{ fontSize:13, color:T.dim }}>No savings funds yet. Add one below to track progress toward a goal or a dated bill (like property tax).</p></Card>}
+        {funds.map(t => {
+          const st = fundStatus(D, t);
+          const editing = editId===t._id;
+          return (
+            <Card key={t._id} style={{ border:`1px solid ${st && st.dated && !st.onTrack ? T.coralMid : T.border}` }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                <span style={{ fontSize:22 }}>{st && st.dated ? '📅' : '🎯'}</span>
+                <div style={{ flex:'1 1 150px', minWidth:0 }}>
+                  <p style={{ fontWeight:800, fontSize:15 }}>{t.label}</p>
+                  <p style={{ fontSize:12, color:T.dim }}>→ {acctLabel(t.to)} · {$(t.amount)}/{t.cadence==='weekly'?'wk':'mo'}{t.fund.dueDate?` · due ${fmtMonth(t.fund.dueDate)}`:''}</p>
+                </div>
+                <button onClick={()=>setEditId(editing?null:t._id)} style={{ background:'none', border:`1px solid ${T.border}`, borderRadius:10, padding:'6px 12px', fontSize:12, cursor:'pointer', color:T.dim, fontWeight:700 }}>{editing?'Close':'Edit'}</button>
+              </div>
+              {st && (
+                <div style={{ marginTop:10 }}>
+                  <Bar val={st.bal} max={st.target||1} color={st.onTrack ? T.green : T.coral} h={10} />
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, marginTop:6, flexWrap:'wrap', gap:4 }}>
+                    <span style={{ color:T.dim }}>{$(st.bal)} of {$(st.target)} saved</span>
+                    {st.dated
+                      ? <span style={{ fontWeight:700, color: st.onTrack ? T.green : T.coral }}>
+                          {st.onTrack ? `✓ On track — ~${$(st.projected)} by ${fmtMonth(t.fund.dueDate)}` : `⚠ Behind ~${$(st.shortfall)} — bump the transfer`}
+                        </span>
+                      : <span style={{ fontWeight:700, color:T.green }}>{st.pct}% there</span>}
+                  </div>
+                </div>
+              )}
+              {editing && <Editor t={t} />}
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* MONTHLY SPEND TRANSFERS */}
+      <p style={{ fontSize:12, fontWeight:800, letterSpacing:1, textTransform:'uppercase', color:T.dim, margin:'4px 0 10px' }}>Monthly / weekly transfers</p>
+      <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:16 }}>
+        {plain.map(t => {
+          const editing = editId===t._id;
+          return (
+            <Card key={t._id} style={{ padding:'14px 16px' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                <span style={{ fontSize:20 }}>🔁</span>
+                <div style={{ flex:'1 1 140px', minWidth:0 }}>
+                  <p style={{ fontWeight:700, fontSize:14 }}>{t.label}</p>
+                  <p style={{ fontSize:12, color:T.dim }}>→ {acctLabel(t.to)} · {t.cadence==='weekly'?'weekly':'monthly'}</p>
+                </div>
+                <AmountRow t={t} />
+                <button onClick={()=>setEditId(editing?null:t._id)} style={{ background:'none', border:`1px solid ${T.border}`, borderRadius:10, padding:'6px 12px', fontSize:12, cursor:'pointer', color:T.dim, fontWeight:700 }}>{editing?'Close':'Edit'}</button>
+              </div>
+              {editing && <Editor t={t} />}
+            </Card>
+          );
+        })}
+      </div>
+
+      <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+        <button onClick={()=>addT(false)} style={{ background:T.amberBg, color:T.amber, border:`1px solid ${T.amberMid}`, borderRadius:12, padding:'11px 18px', fontSize:14, fontWeight:700, cursor:'pointer' }}>+ Add transfer</button>
+        <button onClick={()=>addT(true)} style={{ background:T.greenBg, color:T.green, border:`1px solid ${T.greenMid}`, borderRadius:12, padding:'11px 18px', fontSize:14, fontWeight:700, cursor:'pointer' }}>+ Add savings fund</button>
+      </div>
+    </div>
+  );
+};
+
+// ─── SCREEN: TODAY (balances, editable, live-saved) ──────────────────────────
+const Today = ({ onGo }) => {
+  const [acct, setAcct] = useState(() => ({ ...D.accounts }));
+  const totals = recomputeTotals(acct);
+  const asOf = Math.min(new Date().getDate(), D.cycle?.endDay || 30);
+  const flow = buildProjection({ ...D, accounts: acct }, asOf);
+  const covered = flow.low.balance >= 0;
+  const monthAbbr = (D.cycle?.label || '').split(' ')[0].slice(0,3);
+
+  const setBal = (k, v) => {
+    const next = { ...acct, [k]: v === '' ? 0 : parseFloat(v) || 0 };
+    setAcct(next);
+    debouncedSave('accounts', { accounts: recomputeTotals(next) });
+  };
+  const inp = { width:120, textAlign:'right', border:`1px solid ${T.border}`, borderRadius:10, padding:'8px 12px', fontSize:15, fontFamily:'inherit', outline:'none', background:'#fff', color:T.ink };
+  const Row = ({ k, label }) => (
+    <div style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 0', borderBottom:`1px solid ${T.border}` }}>
+      <span style={{ flex:1, fontSize:14, color:T.ink }}>{label}</span>
+      <span style={{ color:T.dim }}>$</span>
+      <input type="number" inputMode="decimal" value={acct[k] ?? ''} onChange={e=>setBal(k, e.target.value)} style={inp} />
+    </div>
+  );
+
+  return (
+    <div style={{ padding:'clamp(20px,5vw,32px) clamp(16px,5vw,48px)', maxWidth:860, margin:'0 auto' }}>
+      <SectionHeader tag={new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})} tagColor="green"
+        title="Today" sub="Update your balances — they save as you type. Then see if Billing covers the month." />
+
+      <Card style={{ borderTop:`3px solid ${T.green}`, marginBottom:14 }}>
+        <p style={{ fontSize:11, color:T.dim, textTransform:'uppercase', letterSpacing:.5, marginBottom:6 }}>Billing 0970 · operating account</p>
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <span style={{ fontSize:26, color:T.dim }}>$</span>
+          <input type="number" inputMode="decimal" value={acct.billing ?? ''} onChange={e=>setBal('billing', e.target.value)}
+            style={{ flex:1, fontSize:34, fontWeight:800, border:'none', borderBottom:`2px solid ${T.border}`, outline:'none', fontFamily:'inherit', background:'transparent', color:(acct.billing||0) < 200 ? T.coral : T.ink, padding:'4px 0' }} />
+        </div>
+      </Card>
+
+      <Card onClick={()=>onGo('flow')} style={{ cursor:'pointer', marginBottom:16, background: covered ? T.greenBg : T.coralBg, border:`1px solid ${covered ? T.greenMid : T.coralMid}` }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+          <div>
+            <p style={{ fontWeight:800, fontSize:15, color: covered ? T.green : T.coral }}>{covered ? '✓ Billing covers the month' : '⚠ Billing runs short this month'}</p>
+            <p style={{ fontSize:13, color:T.dim, marginTop:2 }}>Lowest point {$$(flow.low.balance)} around {monthAbbr} {flow.low.day}</p>
+          </div>
+          <span style={{ fontSize:13, fontWeight:700, color:T.ink, whiteSpace:'nowrap' }}>See the month →</span>
+        </div>
+      </Card>
+
+      <p style={{ fontSize:12, fontWeight:800, letterSpacing:1, textTransform:'uppercase', color:T.dim, marginBottom:10 }}>Savings &amp; other accounts</p>
+      <Card style={{ marginBottom:16 }}>
+        <Row k="groceries" label="Groceries (Grosh)" />
+        <Row k="propertyTax" label="Property Tax savings" />
+        <Row k="emergency" label="E-Save (emergency)" />
+        <Row k="baselane" label="Baselane (rental)" />
+        <Row k="opFunSavings" label="OP Fun Savings" />
+        <Row k="personalClearing" label="Personal Clearing" />
+      </Card>
+
+      <p style={{ fontSize:12, fontWeight:800, letterSpacing:1, textTransform:'uppercase', color:T.dim, marginBottom:10 }}>Cards &amp; loans</p>
+      <Card style={{ marginBottom:16 }}>
+        <Row k="sapphire" label="Chase Sapphire (2575)" />
+        <Row k="ink" label="Chase Ink (0388)" />
+        <Row k="apple" label="Apple Card" />
+        <Row k="heloc" label="HELOC" />
+      </Card>
+
+      <Card style={{ background:T.greenBg, border:`1px solid ${T.greenMid}` }}>
+        {[['Total liquid', totals.totalLiquid],['Credit-card debt', totals.totalDebt],['Net cash (liquid − cards)', totals.netCash]].map(([lbl,val]) => (
+          <div key={lbl} style={{ display:'flex', justifyContent:'space-between', fontSize:14, padding:'5px 0', borderBottom:`1px solid ${T.greenMid}` }}>
+            <span style={{ color:T.dim }}>{lbl}</span><span style={{ fontWeight:700 }}>{$(val)}</span>
+          </div>
+        ))}
+      </Card>
+    </div>
+  );
+};
+
+// ─── SCREEN: INCOME & BILLS (editable, live-saved) ───────────────────────────
+const IncomeBills = () => {
+  const [tab, setTab] = useState('income');
+  const [sources, setSources] = useState(() => (D.income?.sources || []).map((s,i)=>({ ...s, _id:i })));
+  const [bills, setBills] = useState(() => (D.fixedBillsList || []).map((b,i)=>({ ...b, _id: b.id || `b_${i}` })));
+
+  const saveSources = (next) => { setSources(next); const clean = next.map(({_id,...r})=>r); const total = Math.round(clean.reduce((s,x)=>s+(Number(x.amt)||0),0)); debouncedSave('income', { income:{ total, sources: clean } }); };
+  const updSource = (id,k,v) => saveSources(sources.map(s=> s._id===id ? { ...s, [k]: k==='amt' ? (parseFloat(v)||0) : k==='day' ? (v===''?null:Math.max(1,Math.min(31,parseInt(v)||1))) : v } : s));
+  const addSource = () => saveSources([...sources, { _id:Date.now(), label:'New income', amt:0, acct:'Billing', when:'Monthly', day:15 }]);
+  const rmSource = (id) => saveSources(sources.filter(s=>s._id!==id));
+
+  const saveBills = (next) => { setBills(next); const clean = next.map(({_id,...r})=>({ ...r, id: r.id||_id })); debouncedSave('bills', { fixedBillsList: clean }); };
+  const updBill = (id,k,v) => saveBills(bills.map(b=> b._id===id ? { ...b, [k]: k==='amount' ? (parseFloat(v)||0) : k==='day' ? (v===''?null:Math.max(1,Math.min(31,parseInt(v)||1))) : v } : b));
+  const moveBill = (id,dir) => saveBills((()=>{ const i=bills.findIndex(b=>b._id===id); const j=i+dir; if(i<0||j<0||j>=bills.length) return bills; const n=[...bills]; [n[i],n[j]]=[n[j],n[i]]; return n; })());
+  const addBill = () => saveBills([...bills, { _id:`b_${Date.now()}`, name:'New bill', amount:0, day:1, note:'' }]);
+  const rmBill = (id) => saveBills(bills.filter(b=>b._id!==id));
+
+  const incomeTotal = Math.round(sources.reduce((s,x)=>s+(Number(x.amt)||0),0));
+  const billsTotal = bills.filter(b=>!b.paused).reduce((s,b)=>s+(Number(b.amount)||0),0);
+  const field = { border:`1px solid ${T.border}`, borderRadius:10, padding:'9px 12px', fontSize:14, fontFamily:'inherit', outline:'none', background:'#fff', color:T.ink, width:'100%' };
+  const lbl = { fontSize:11, color:T.dim, fontWeight:700, marginBottom:3, display:'block' };
+
+  return (
+    <div style={{ padding:'clamp(20px,5vw,32px) clamp(16px,5vw,48px)', maxWidth:860, margin:'0 auto' }}>
+      <SectionHeader tag="Set it and tweak it" tagColor="amber" title="Income & Bills" sub="Your paychecks and external bills. Changes save as you type and feed the projection." />
+      <div style={{ display:'flex', gap:6, background:'#F4F1EC', borderRadius:12, padding:4, marginBottom:18 }}>
+        {[['income',`📥 Income · ${$(incomeTotal)}`],['bills',`🧾 Bills · ${$(Math.round(billsTotal))}`]].map(([id,label]) => (
+          <button key={id} onClick={()=>setTab(id)} style={{ flex:1, background: tab===id?'#fff':'transparent', border:'none', borderRadius:9, padding:'8px 6px', fontSize:13, fontWeight:700, color: tab===id?T.ink:T.dim, cursor:'pointer', boxShadow: tab===id?'0 1px 4px rgba(0,0,0,0.08)':'none' }}>{label}</button>
+        ))}
+      </div>
+
+      {tab==='income' && (<>
+        <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:14 }}>
+          {sources.map(s => (
+            <Card key={s._id} style={{ padding:'14px 16px' }}>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:10, marginBottom:10 }}>
+                <div><span style={lbl}>Source name</span><input value={s.label} onChange={e=>updSource(s._id,'label',e.target.value)} style={field} /></div>
+                <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+                  <div style={{ flex:'1 1 110px' }}><span style={lbl}>Monthly $</span>
+                    <input type="number" inputMode="decimal" value={s.amt} onChange={e=>updSource(s._id,'amt',e.target.value)} style={{ ...field, textAlign:'right' }} /></div>
+                  <div style={{ flex:'1 1 110px' }}><span style={lbl}>Account</span>
+                    <input value={s.acct} onChange={e=>updSource(s._id,'acct',e.target.value)} style={field} /></div>
+                </div>
+              </div>
+              <div style={{ display:'flex', flexWrap:'wrap', alignItems:'flex-end', gap:10 }}>
+                <div style={{ flex:'1 1 110px' }}><span style={lbl}>Timing label</span><input value={s.when||''} onChange={e=>updSource(s._id,'when',e.target.value)} style={field} placeholder="e.g. 15th" /></div>
+                <div style={{ width:72 }}><span style={lbl}>Day</span><input type="number" inputMode="numeric" min="1" max="31" value={s.day ?? ''} onChange={e=>updSource(s._id,'day',e.target.value)} style={{ ...field, textAlign:'center' }} placeholder="—" /></div>
+                <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:T.dim, whiteSpace:'nowrap', paddingBottom:10 }}>
+                  <input type="checkbox" checked={!!s.allocate} onChange={e=>updSource(s._id,'allocate',e.target.checked)} /> allocate only
+                </label>
+                <button onClick={()=>rmSource(s._id)} style={{ background:T.coralBg, color:T.coral, border:`1px solid ${T.coralMid}`, borderRadius:10, padding:'8px 14px', fontSize:13, cursor:'pointer', fontWeight:700, marginLeft:'auto' }}>Remove</button>
+              </div>
+            </Card>
+          ))}
+        </div>
+        <button onClick={addSource} style={{ background:T.greenBg, color:T.green, border:`1px solid ${T.greenMid}`, borderRadius:12, padding:'11px 20px', fontSize:14, fontWeight:700, cursor:'pointer' }}>+ Add income source</button>
+      </>)}
+
+      {tab==='bills' && (<>
+        <p style={{ color:T.dim, fontSize:13, marginBottom:14 }}>External bills only — money moved between your own accounts lives on <strong>Transfers</strong>. Set each bill's <strong>day</strong> so the projection knows when it hits.</p>
+        <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:14 }}>
+          {bills.map((b, idx) => (
+            <EditableRow key={b._id} idx={idx} total={bills.length}
+              onUp={()=>moveBill(b._id,-1)} onDown={()=>moveBill(b._id,1)} onDelete={()=>rmBill(b._id)}
+              T={T} fieldStyle={field}
+              nameValue={b.name} onNameChange={v=>updBill(b._id,'name',v)} namePlaceholder="Bill name"
+              noteValue={b.note} onNoteChange={v=>updBill(b._id,'note',v)} notePlaceholder="Due date / notes"
+              amountValue={b.amount} onAmountChange={v=>updBill(b._id,'amount',v)}
+              dayValue={b.day} onDayChange={v=>updBill(b._id,'day',v)} />
+          ))}
+        </div>
+        <button onClick={addBill} style={{ background:T.greenBg, color:T.green, border:`1px solid ${T.greenMid}`, borderRadius:12, padding:'11px 20px', fontSize:14, fontWeight:700, cursor:'pointer' }}>+ Add bill</button>
+      </>)}
+    </div>
+  );
+};
+
 const SCREENS = [
-  { id:'welcome',     label:'Home',            comp: null },
+  { id:'today',       label:'Today',           comp: Today },
   { id:'flow',        label:'This Month',      comp: CashFlowTimeline },
-  { id:'lastsession', label:'Last Session',    comp: LastSession },
-  { id:'picture',     label:'Big Picture',     comp: BigPicture },
-  { id:'cashflow',    label:'Cash Flow',       comp: CashFlow },
-  { id:'spending',    label:'Spending',        comp: Spending },
-  { id:'debt',        label:'Debt',            comp: Debt },
-  { id:'goals',       label:'Goals',           comp: Goals },
-  { id:'decisions',   label:'Big Decisions',   comp: BigDecisions },
-  { id:'upcoming',    label:'Upcoming Changes',comp: UpcomingChanges },
+  { id:'transfers',   label:'Transfers',       comp: Transfers },
+  { id:'incomebills', label:'Income & Bills',  comp: IncomeBills },
+  { id:'goals',       label:'Allocate',        comp: GoalsProgress },
   { id:'ourlist',     label:'Our Lists',       comp: OurListsScreen },
 ];
 
@@ -2541,9 +3219,8 @@ const App = () => {
   const [idx, setIdx] = useState(() => {
     const fromHash = hashToIdx();
     if (fromHash !== null) return fromHash;
-    try { return parseInt(localStorage.getItem('moneydate_screen') || '0', 10); } catch { return 0; }
+    try { const n = parseInt(localStorage.getItem('moneydate_screen') || '0', 10); return (n >= 0 && n < SCREENS.length) ? n : 0; } catch { return 0; }
   });
-  const [prepMode, setPrepMode] = useState(false);
 
   useEffect(() => {
     const fallback = setTimeout(() => setReady(true), 8000);
@@ -2580,63 +3257,35 @@ const App = () => {
     window.location.hash = SCREENS[c].id;
   };
   const S = SCREENS[idx];
-  const isHome = idx === 0;
+  const goId = (id) => { const i = SCREENS.findIndex(s => s.id === id); if (i >= 0) go(i); };
+  const fullBleed = S.id === 'ourlist';
 
   if (!ready) return (
     <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100vh', background:'#FAF7F2', gap:16 }}>
       <p style={{ fontSize:36 }}>💚</p>
       <p style={{ fontFamily:"'Playfair Display', serif", fontSize:22, fontWeight:700, color:'#1C1C1E' }}>Cadence</p>
-      <p style={{ fontSize:14, color:'#6B6B70' }}>Loading your money date…</p>
+      <p style={{ fontSize:14, color:'#6B6B70' }}>Loading…</p>
     </div>
   );
 
-  if (prepMode) return <PrepMode onExit={() => setPrepMode(false)} />;
-
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', background: T.cream, overflow:'hidden' }}>
-      {!isHome && S.id !== 'ourlist' && (
-        <nav style={{ display:'flex', alignItems:'center', gap:4, padding:'10px 40px', borderBottom:`1px solid ${T.border}`, background:'#FFF', flexShrink:0, flexWrap:'wrap' }}>
-          <button onClick={()=>go(0)} style={{ background:'none', border:'none', cursor:'pointer', color: T.dim, fontSize:13, fontWeight:600, padding:'4px 10px', borderRadius:100, marginRight:4 }}>💚 Cadence</button>
-          <div style={{ width:1, height:16, background: T.border, marginRight:4 }} />
-          {SCREENS.slice(1).map((s,i) => (
-            <button key={s.id} onClick={()=>go(i+1)} style={{
-              background: idx===i+1 ? T.ink : 'transparent', color: idx===i+1 ? '#fff' : T.dim,
-              border:'none', borderRadius:100, padding:'5px 14px', fontSize:13,
-              fontWeight: idx===i+1 ? 700 : 400, cursor:'pointer', transition:'all .15s'
+      {!fullBleed && (
+        <nav style={{ display:'flex', alignItems:'center', gap:4, padding:'10px clamp(12px,4vw,32px)', borderBottom:`1px solid ${T.border}`, background:'#FFF', flexShrink:0, overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
+          <span style={{ color: T.green, fontSize:16, marginRight:4, flexShrink:0 }}>💚</span>
+          {SCREENS.map((s,i) => (
+            <button key={s.id} onClick={()=>go(i)} style={{
+              background: idx===i ? T.ink : 'transparent', color: idx===i ? '#fff' : T.dim,
+              border:'none', borderRadius:100, padding:'6px 14px', fontSize:13, whiteSpace:'nowrap', flexShrink:0,
+              fontWeight: idx===i ? 700 : 500, cursor:'pointer', transition:'all .15s'
             }}>{s.label}</button>
           ))}
-          <span style={{ marginLeft:'auto', fontSize:12, color: T.dim, fontWeight:600 }}>{idx}/{SCREENS.length-1}</span>
         </nav>
       )}
 
       <PullToRefresh>
-        {isHome ? <Welcome onStart={()=>go(1)} onPrep={()=>setPrepMode(true)} /> : S.comp ? <S.comp onGoHome={()=>go(0)} onPrep={()=>setPrepMode(true)} /> : null}
+        {S.comp ? <S.comp onGo={goId} onGoHome={()=>go(0)} /> : null}
       </PullToRefresh>
-
-      {!isHome && S.id !== 'ourlist' && (
-        <footer style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 40px', borderTop:`1px solid ${T.border}`, background:'#FFF', flexShrink:0 }}>
-          <button onClick={()=>go(idx-1)} disabled={idx<=1} style={{
-            background:'none', border:`1px solid ${idx<=1 ? T.border : T.border}`, borderRadius:100,
-            padding:'9px 22px', fontSize:14, cursor: idx<=1?'default':'pointer',
-            color: idx<=1 ? T.border : T.ink, transition:'all .15s'
-          }}>← Back</button>
-
-          <div style={{ display:'flex', gap:6, alignItems:'center' }}>
-            {SCREENS.slice(1).map((_,i) => (
-              <div key={i} onClick={()=>go(i+1)} style={{
-                width: i+1===idx ? 22 : 8, height:8, borderRadius:4,
-                background: i+1===idx ? T.ink : T.border,
-                cursor:'pointer', transition:'all .3s'
-              }} />
-            ))}
-          </div>
-
-          {idx < SCREENS.length-1
-            ? <button onClick={()=>go(idx+1)} style={{ background: T.ink, color:'#fff', border:'none', borderRadius:100, padding:'9px 26px', fontSize:14, fontWeight:700, cursor:'pointer' }}>Next →</button>
-            : <button onClick={()=>go(0)} style={{ background: T.green, color:'#fff', border:'none', borderRadius:100, padding:'9px 26px', fontSize:14, fontWeight:700, cursor:'pointer' }}>Start Over 🔄</button>
-          }
-        </footer>
-      )}
     </div>
   );
 };
