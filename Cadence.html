@@ -2411,6 +2411,30 @@ const fundStatus = (D, t) => {
   return { bal, monthly, months, projected, target, onTrack, pct, dated: !!t.fund.dueDate, shortfall: Math.max(0, Math.round((target - projected) * 100) / 100) };
 };
 
+// Live-save: merge a patch into the in-memory D and upsert the whole budget blob.
+// Used by the editable screens so changes persist immediately (no separate "apply").
+const LIQUID_KEYS = ['billing','groceries','propertyTax','emergency','baselane','opFunSavings','personalClearing'];
+const recomputeTotals = (accounts) => {
+  const liquid = LIQUID_KEYS.reduce((s,k)=> s + (Number(accounts[k])||0), 0);
+  const debt = (Number(accounts.sapphire)||0) + (Number(accounts.ink)||0) + (Number(accounts.apple)||0);
+  return { ...accounts, totalLiquid: Math.round(liquid*100)/100, totalDebt: Math.round(debt*100)/100, netCash: Math.round((liquid-debt)*100)/100 };
+};
+const saveBudget = (patch) => {
+  Object.assign(D, patch);
+  if (D.fixedBillsList) D.fixedBills = Math.round(D.fixedBillsList.reduce((s,b)=> s + (Number(b.amount)||0), 0));
+  return db.saveBudgetData({
+    date:D.date, cycle:D.cycle, accounts:D.accounts, income:D.income, grocery:D.grocery,
+    transfers:D.transfers, fixedBills:D.fixedBills, fixedBillsList:D.fixedBillsList,
+    variableSpend:D.variableSpend, deficit:D.deficit, spending:D.spending, goals:D.goals,
+  }).catch(e => console.error('saveBudget failed:', e));
+};
+// Debounce a function by `ms` (module-level, per-key timers).
+const _debTimers = {};
+const debouncedSave = (key, patch, ms = 600) => {
+  clearTimeout(_debTimers[key]);
+  _debTimers[key] = setTimeout(() => saveBudget(patch), ms);
+};
+
 // Accounts a float transfer could come from, largest balance first.
 const floatSources = (D) => ([
   ['emergency', 'Emergency Fund'], ['baselane', 'Baselane'],
@@ -2452,7 +2476,7 @@ const BalanceChart = ({ flow }) => {
 };
 
 // ─── SCREEN: CASH FLOW TIMELINE (This Month) ─────────────────────────────────
-const CashFlowTimeline = ({ onPrep }) => {
+const CashFlowTimeline = ({ onGo }) => {
   const today = new Date();
   const [asOfDay, setAsOfDay] = useState(() => Math.min(today.getDate(), D.cycle?.endDay || 30));
   const flow = buildProjection(D, asOfDay);
@@ -2480,7 +2504,7 @@ const CashFlowTimeline = ({ onPrep }) => {
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12, flexWrap:'wrap', marginBottom: 20 }}>
         <SectionHeader tag={`${monthLabel} · the need-to-know`} tagColor={covered ? 'green' : 'red'}
           title="Will Billing cover it?" sub="Your checking balance, walked forward through every paycheck, bill, and grocery transfer left this month." />
-        <button onClick={onPrep} style={{ background: T.ink, color:'#fff', border:'none', borderRadius:100, padding:'9px 18px', fontSize:13, fontWeight:700, cursor:'pointer', flexShrink:0, marginTop:4 }}>🔧 Update numbers</button>
+        <button onClick={()=>onGo('today')} style={{ background: T.ink, color:'#fff', border:'none', borderRadius:100, padding:'9px 18px', fontSize:13, fontWeight:700, cursor:'pointer', flexShrink:0, marginTop:4 }}>🔧 Update balances</button>
       </div>
 
       {/* VERDICT */}
@@ -2591,7 +2615,7 @@ const CashFlowTimeline = ({ onPrep }) => {
 // schema change); saved = running total, contributions = timestamped log.
 const GOAL_ICONS = ['🛡️','🍳','🏠','🚗','✈️','👶','💍','🎓','🏖️','💰','🎯','❤️'];
 
-const GoalsProgress = ({ onPrep }) => {
+const GoalsProgress = ({ onGo }) => {
   const [goals, setGoals] = useState(() => (D.goals || []).map((g, i) => ({
     _id: g.id || `g_${i}`, icon: g.icon || '🎯', name: g.name || 'Goal',
     target: Number(g.target) || 0, saved: Number(g.saved) || 0, note: g.note || '',
@@ -2664,7 +2688,7 @@ const GoalsProgress = ({ onPrep }) => {
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12, flexWrap:'wrap', marginBottom: 20 }}>
         <SectionHeader tag="Surplus → Progress" tagColor={monthlySurplus>=0?'green':'amber'}
           title="Goals & Progress" sub="Turn what's left each month into real progress — and celebrate every step." />
-        <button onClick={onPrep} style={{ background: T.ink, color:'#fff', border:'none', borderRadius:100, padding:'9px 18px', fontSize:13, fontWeight:700, cursor:'pointer', flexShrink:0, marginTop:4 }}>🔧 Income &amp; bills</button>
+        <button onClick={()=>onGo('incomebills')} style={{ background: T.ink, color:'#fff', border:'none', borderRadius:100, padding:'9px 18px', fontSize:13, fontWeight:700, cursor:'pointer', flexShrink:0, marginTop:4 }}>🔧 Income &amp; bills</button>
       </div>
 
       {/* SURPLUS */}
@@ -2819,7 +2843,7 @@ const GoalsProgress = ({ onPrep }) => {
 //  • monthly spend transfers (no fund) — e.g. the weekly grocery envelope
 const TRANSFER_ACCTS = [['groceries','Groceries'],['propertyTax','Property Tax'],['emergency','E-Save'],['opFunSavings','Fun Savings'],['baselane','Baselane'],['personalClearing','Personal Clearing']];
 
-const Transfers = ({ onPrep }) => {
+const Transfers = ({ onGo }) => {
   const narrow = useIsNarrow();
   const [transfers, setTransfers] = useState(() => (D.transfers || []).map((t,i)=>({ ...t, _id: t.id || `t_${i}` })));
   const [editId, setEditId] = useState(null);
@@ -2968,18 +2992,165 @@ const Transfers = ({ onPrep }) => {
   );
 };
 
+// ─── SCREEN: TODAY (balances, editable, live-saved) ──────────────────────────
+const Today = ({ onGo }) => {
+  const [acct, setAcct] = useState(() => ({ ...D.accounts }));
+  const totals = recomputeTotals(acct);
+  const asOf = Math.min(new Date().getDate(), D.cycle?.endDay || 30);
+  const flow = buildProjection({ ...D, accounts: acct }, asOf);
+  const covered = flow.low.balance >= 0;
+  const monthAbbr = (D.cycle?.label || '').split(' ')[0].slice(0,3);
+
+  const setBal = (k, v) => {
+    const next = { ...acct, [k]: v === '' ? 0 : parseFloat(v) || 0 };
+    setAcct(next);
+    debouncedSave('accounts', { accounts: recomputeTotals(next) });
+  };
+  const inp = { width:120, textAlign:'right', border:`1px solid ${T.border}`, borderRadius:10, padding:'8px 12px', fontSize:15, fontFamily:'inherit', outline:'none', background:'#fff', color:T.ink };
+  const Row = ({ k, label }) => (
+    <div style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 0', borderBottom:`1px solid ${T.border}` }}>
+      <span style={{ flex:1, fontSize:14, color:T.ink }}>{label}</span>
+      <span style={{ color:T.dim }}>$</span>
+      <input type="number" inputMode="decimal" value={acct[k] ?? ''} onChange={e=>setBal(k, e.target.value)} style={inp} />
+    </div>
+  );
+
+  return (
+    <div style={{ padding:'clamp(20px,5vw,32px) clamp(16px,5vw,48px)', maxWidth:860, margin:'0 auto' }}>
+      <SectionHeader tag={new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})} tagColor="green"
+        title="Today" sub="Update your balances — they save as you type. Then see if Billing covers the month." />
+
+      <Card style={{ borderTop:`3px solid ${T.green}`, marginBottom:14 }}>
+        <p style={{ fontSize:11, color:T.dim, textTransform:'uppercase', letterSpacing:.5, marginBottom:6 }}>Billing 0970 · operating account</p>
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <span style={{ fontSize:26, color:T.dim }}>$</span>
+          <input type="number" inputMode="decimal" value={acct.billing ?? ''} onChange={e=>setBal('billing', e.target.value)}
+            style={{ flex:1, fontSize:34, fontWeight:800, border:'none', borderBottom:`2px solid ${T.border}`, outline:'none', fontFamily:'inherit', background:'transparent', color:(acct.billing||0) < 200 ? T.coral : T.ink, padding:'4px 0' }} />
+        </div>
+      </Card>
+
+      <Card onClick={()=>onGo('flow')} style={{ cursor:'pointer', marginBottom:16, background: covered ? T.greenBg : T.coralBg, border:`1px solid ${covered ? T.greenMid : T.coralMid}` }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+          <div>
+            <p style={{ fontWeight:800, fontSize:15, color: covered ? T.green : T.coral }}>{covered ? '✓ Billing covers the month' : '⚠ Billing runs short this month'}</p>
+            <p style={{ fontSize:13, color:T.dim, marginTop:2 }}>Lowest point {$$(flow.low.balance)} around {monthAbbr} {flow.low.day}</p>
+          </div>
+          <span style={{ fontSize:13, fontWeight:700, color:T.ink, whiteSpace:'nowrap' }}>See the month →</span>
+        </div>
+      </Card>
+
+      <p style={{ fontSize:12, fontWeight:800, letterSpacing:1, textTransform:'uppercase', color:T.dim, marginBottom:10 }}>Savings &amp; other accounts</p>
+      <Card style={{ marginBottom:16 }}>
+        <Row k="groceries" label="Groceries (Grosh)" />
+        <Row k="propertyTax" label="Property Tax savings" />
+        <Row k="emergency" label="E-Save (emergency)" />
+        <Row k="baselane" label="Baselane (rental)" />
+        <Row k="opFunSavings" label="OP Fun Savings" />
+        <Row k="personalClearing" label="Personal Clearing" />
+      </Card>
+
+      <p style={{ fontSize:12, fontWeight:800, letterSpacing:1, textTransform:'uppercase', color:T.dim, marginBottom:10 }}>Cards &amp; loans</p>
+      <Card style={{ marginBottom:16 }}>
+        <Row k="sapphire" label="Chase Sapphire (2575)" />
+        <Row k="ink" label="Chase Ink (0388)" />
+        <Row k="apple" label="Apple Card" />
+        <Row k="heloc" label="HELOC" />
+      </Card>
+
+      <Card style={{ background:T.greenBg, border:`1px solid ${T.greenMid}` }}>
+        {[['Total liquid', totals.totalLiquid],['Credit-card debt', totals.totalDebt],['Net cash (liquid − cards)', totals.netCash]].map(([lbl,val]) => (
+          <div key={lbl} style={{ display:'flex', justifyContent:'space-between', fontSize:14, padding:'5px 0', borderBottom:`1px solid ${T.greenMid}` }}>
+            <span style={{ color:T.dim }}>{lbl}</span><span style={{ fontWeight:700 }}>{$(val)}</span>
+          </div>
+        ))}
+      </Card>
+    </div>
+  );
+};
+
+// ─── SCREEN: INCOME & BILLS (editable, live-saved) ───────────────────────────
+const IncomeBills = () => {
+  const [tab, setTab] = useState('income');
+  const [sources, setSources] = useState(() => (D.income?.sources || []).map((s,i)=>({ ...s, _id:i })));
+  const [bills, setBills] = useState(() => (D.fixedBillsList || []).map((b,i)=>({ ...b, _id: b.id || `b_${i}` })));
+
+  const saveSources = (next) => { setSources(next); const clean = next.map(({_id,...r})=>r); const total = Math.round(clean.reduce((s,x)=>s+(Number(x.amt)||0),0)); debouncedSave('income', { income:{ total, sources: clean } }); };
+  const updSource = (id,k,v) => saveSources(sources.map(s=> s._id===id ? { ...s, [k]: k==='amt' ? (parseFloat(v)||0) : k==='day' ? (v===''?null:Math.max(1,Math.min(31,parseInt(v)||1))) : v } : s));
+  const addSource = () => saveSources([...sources, { _id:Date.now(), label:'New income', amt:0, acct:'Billing', when:'Monthly', day:15 }]);
+  const rmSource = (id) => saveSources(sources.filter(s=>s._id!==id));
+
+  const saveBills = (next) => { setBills(next); const clean = next.map(({_id,...r})=>({ ...r, id: r.id||_id })); debouncedSave('bills', { fixedBillsList: clean }); };
+  const updBill = (id,k,v) => saveBills(bills.map(b=> b._id===id ? { ...b, [k]: k==='amount' ? (parseFloat(v)||0) : k==='day' ? (v===''?null:Math.max(1,Math.min(31,parseInt(v)||1))) : v } : b));
+  const moveBill = (id,dir) => saveBills((()=>{ const i=bills.findIndex(b=>b._id===id); const j=i+dir; if(i<0||j<0||j>=bills.length) return bills; const n=[...bills]; [n[i],n[j]]=[n[j],n[i]]; return n; })());
+  const addBill = () => saveBills([...bills, { _id:`b_${Date.now()}`, name:'New bill', amount:0, day:1, note:'' }]);
+  const rmBill = (id) => saveBills(bills.filter(b=>b._id!==id));
+
+  const incomeTotal = Math.round(sources.reduce((s,x)=>s+(Number(x.amt)||0),0));
+  const billsTotal = bills.filter(b=>!b.paused).reduce((s,b)=>s+(Number(b.amount)||0),0);
+  const field = { border:`1px solid ${T.border}`, borderRadius:10, padding:'9px 12px', fontSize:14, fontFamily:'inherit', outline:'none', background:'#fff', color:T.ink, width:'100%' };
+  const lbl = { fontSize:11, color:T.dim, fontWeight:700, marginBottom:3, display:'block' };
+
+  return (
+    <div style={{ padding:'clamp(20px,5vw,32px) clamp(16px,5vw,48px)', maxWidth:860, margin:'0 auto' }}>
+      <SectionHeader tag="Set it and tweak it" tagColor="amber" title="Income & Bills" sub="Your paychecks and external bills. Changes save as you type and feed the projection." />
+      <div style={{ display:'flex', gap:6, background:'#F4F1EC', borderRadius:12, padding:4, marginBottom:18 }}>
+        {[['income',`📥 Income · ${$(incomeTotal)}`],['bills',`🧾 Bills · ${$(Math.round(billsTotal))}`]].map(([id,label]) => (
+          <button key={id} onClick={()=>setTab(id)} style={{ flex:1, background: tab===id?'#fff':'transparent', border:'none', borderRadius:9, padding:'8px 6px', fontSize:13, fontWeight:700, color: tab===id?T.ink:T.dim, cursor:'pointer', boxShadow: tab===id?'0 1px 4px rgba(0,0,0,0.08)':'none' }}>{label}</button>
+        ))}
+      </div>
+
+      {tab==='income' && (<>
+        <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:14 }}>
+          {sources.map(s => (
+            <Card key={s._id} style={{ padding:'14px 16px' }}>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:10, marginBottom:10 }}>
+                <div><span style={lbl}>Source name</span><input value={s.label} onChange={e=>updSource(s._id,'label',e.target.value)} style={field} /></div>
+                <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+                  <div style={{ flex:'1 1 110px' }}><span style={lbl}>Monthly $</span>
+                    <input type="number" inputMode="decimal" value={s.amt} onChange={e=>updSource(s._id,'amt',e.target.value)} style={{ ...field, textAlign:'right' }} /></div>
+                  <div style={{ flex:'1 1 110px' }}><span style={lbl}>Account</span>
+                    <input value={s.acct} onChange={e=>updSource(s._id,'acct',e.target.value)} style={field} /></div>
+                </div>
+              </div>
+              <div style={{ display:'flex', flexWrap:'wrap', alignItems:'flex-end', gap:10 }}>
+                <div style={{ flex:'1 1 110px' }}><span style={lbl}>Timing label</span><input value={s.when||''} onChange={e=>updSource(s._id,'when',e.target.value)} style={field} placeholder="e.g. 15th" /></div>
+                <div style={{ width:72 }}><span style={lbl}>Day</span><input type="number" inputMode="numeric" min="1" max="31" value={s.day ?? ''} onChange={e=>updSource(s._id,'day',e.target.value)} style={{ ...field, textAlign:'center' }} placeholder="—" /></div>
+                <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:T.dim, whiteSpace:'nowrap', paddingBottom:10 }}>
+                  <input type="checkbox" checked={!!s.allocate} onChange={e=>updSource(s._id,'allocate',e.target.checked)} /> allocate only
+                </label>
+                <button onClick={()=>rmSource(s._id)} style={{ background:T.coralBg, color:T.coral, border:`1px solid ${T.coralMid}`, borderRadius:10, padding:'8px 14px', fontSize:13, cursor:'pointer', fontWeight:700, marginLeft:'auto' }}>Remove</button>
+              </div>
+            </Card>
+          ))}
+        </div>
+        <button onClick={addSource} style={{ background:T.greenBg, color:T.green, border:`1px solid ${T.greenMid}`, borderRadius:12, padding:'11px 20px', fontSize:14, fontWeight:700, cursor:'pointer' }}>+ Add income source</button>
+      </>)}
+
+      {tab==='bills' && (<>
+        <p style={{ color:T.dim, fontSize:13, marginBottom:14 }}>External bills only — money moved between your own accounts lives on <strong>Transfers</strong>. Set each bill's <strong>day</strong> so the projection knows when it hits.</p>
+        <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:14 }}>
+          {bills.map((b, idx) => (
+            <EditableRow key={b._id} idx={idx} total={bills.length}
+              onUp={()=>moveBill(b._id,-1)} onDown={()=>moveBill(b._id,1)} onDelete={()=>rmBill(b._id)}
+              T={T} fieldStyle={field}
+              nameValue={b.name} onNameChange={v=>updBill(b._id,'name',v)} namePlaceholder="Bill name"
+              noteValue={b.note} onNoteChange={v=>updBill(b._id,'note',v)} notePlaceholder="Due date / notes"
+              amountValue={b.amount} onAmountChange={v=>updBill(b._id,'amount',v)}
+              dayValue={b.day} onDayChange={v=>updBill(b._id,'day',v)} />
+          ))}
+        </div>
+        <button onClick={addBill} style={{ background:T.greenBg, color:T.green, border:`1px solid ${T.greenMid}`, borderRadius:12, padding:'11px 20px', fontSize:14, fontWeight:700, cursor:'pointer' }}>+ Add bill</button>
+      </>)}
+    </div>
+  );
+};
+
 const SCREENS = [
-  { id:'welcome',     label:'Home',            comp: null },
+  { id:'today',       label:'Today',           comp: Today },
   { id:'flow',        label:'This Month',      comp: CashFlowTimeline },
   { id:'transfers',   label:'Transfers',       comp: Transfers },
-  { id:'lastsession', label:'Last Session',    comp: LastSession },
-  { id:'picture',     label:'Big Picture',     comp: BigPicture },
-  { id:'cashflow',    label:'Cash Flow',       comp: CashFlow },
-  { id:'spending',    label:'Spending',        comp: Spending },
-  { id:'debt',        label:'Debt',            comp: Debt },
+  { id:'incomebills', label:'Income & Bills',  comp: IncomeBills },
   { id:'goals',       label:'Goals',           comp: GoalsProgress },
-  { id:'decisions',   label:'Big Decisions',   comp: BigDecisions },
-  { id:'upcoming',    label:'Upcoming Changes',comp: UpcomingChanges },
   { id:'ourlist',     label:'Our Lists',       comp: OurListsScreen },
 ];
 
@@ -2998,9 +3169,8 @@ const App = () => {
   const [idx, setIdx] = useState(() => {
     const fromHash = hashToIdx();
     if (fromHash !== null) return fromHash;
-    try { return parseInt(localStorage.getItem('moneydate_screen') || '0', 10); } catch { return 0; }
+    try { const n = parseInt(localStorage.getItem('moneydate_screen') || '0', 10); return (n >= 0 && n < SCREENS.length) ? n : 0; } catch { return 0; }
   });
-  const [prepMode, setPrepMode] = useState(false);
 
   useEffect(() => {
     const fallback = setTimeout(() => setReady(true), 8000);
@@ -3037,63 +3207,35 @@ const App = () => {
     window.location.hash = SCREENS[c].id;
   };
   const S = SCREENS[idx];
-  const isHome = idx === 0;
+  const goId = (id) => { const i = SCREENS.findIndex(s => s.id === id); if (i >= 0) go(i); };
+  const fullBleed = S.id === 'ourlist';
 
   if (!ready) return (
     <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100vh', background:'#FAF7F2', gap:16 }}>
       <p style={{ fontSize:36 }}>💚</p>
       <p style={{ fontFamily:"'Playfair Display', serif", fontSize:22, fontWeight:700, color:'#1C1C1E' }}>Cadence</p>
-      <p style={{ fontSize:14, color:'#6B6B70' }}>Loading your money date…</p>
+      <p style={{ fontSize:14, color:'#6B6B70' }}>Loading…</p>
     </div>
   );
 
-  if (prepMode) return <PrepMode onExit={() => setPrepMode(false)} />;
-
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', background: T.cream, overflow:'hidden' }}>
-      {!isHome && S.id !== 'ourlist' && (
-        <nav style={{ display:'flex', alignItems:'center', gap:4, padding:'10px 40px', borderBottom:`1px solid ${T.border}`, background:'#FFF', flexShrink:0, flexWrap:'wrap' }}>
-          <button onClick={()=>go(0)} style={{ background:'none', border:'none', cursor:'pointer', color: T.dim, fontSize:13, fontWeight:600, padding:'4px 10px', borderRadius:100, marginRight:4 }}>💚 Cadence</button>
-          <div style={{ width:1, height:16, background: T.border, marginRight:4 }} />
-          {SCREENS.slice(1).map((s,i) => (
-            <button key={s.id} onClick={()=>go(i+1)} style={{
-              background: idx===i+1 ? T.ink : 'transparent', color: idx===i+1 ? '#fff' : T.dim,
-              border:'none', borderRadius:100, padding:'5px 14px', fontSize:13,
-              fontWeight: idx===i+1 ? 700 : 400, cursor:'pointer', transition:'all .15s'
+      {!fullBleed && (
+        <nav style={{ display:'flex', alignItems:'center', gap:4, padding:'10px clamp(12px,4vw,32px)', borderBottom:`1px solid ${T.border}`, background:'#FFF', flexShrink:0, overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
+          <span style={{ color: T.green, fontSize:16, marginRight:4, flexShrink:0 }}>💚</span>
+          {SCREENS.map((s,i) => (
+            <button key={s.id} onClick={()=>go(i)} style={{
+              background: idx===i ? T.ink : 'transparent', color: idx===i ? '#fff' : T.dim,
+              border:'none', borderRadius:100, padding:'6px 14px', fontSize:13, whiteSpace:'nowrap', flexShrink:0,
+              fontWeight: idx===i ? 700 : 500, cursor:'pointer', transition:'all .15s'
             }}>{s.label}</button>
           ))}
-          <span style={{ marginLeft:'auto', fontSize:12, color: T.dim, fontWeight:600 }}>{idx}/{SCREENS.length-1}</span>
         </nav>
       )}
 
       <PullToRefresh>
-        {isHome ? <Welcome onStart={()=>go(1)} onPrep={()=>setPrepMode(true)} /> : S.comp ? <S.comp onGoHome={()=>go(0)} onPrep={()=>setPrepMode(true)} /> : null}
+        {S.comp ? <S.comp onGo={goId} onGoHome={()=>go(0)} /> : null}
       </PullToRefresh>
-
-      {!isHome && S.id !== 'ourlist' && (
-        <footer style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 40px', borderTop:`1px solid ${T.border}`, background:'#FFF', flexShrink:0 }}>
-          <button onClick={()=>go(idx-1)} disabled={idx<=1} style={{
-            background:'none', border:`1px solid ${idx<=1 ? T.border : T.border}`, borderRadius:100,
-            padding:'9px 22px', fontSize:14, cursor: idx<=1?'default':'pointer',
-            color: idx<=1 ? T.border : T.ink, transition:'all .15s'
-          }}>← Back</button>
-
-          <div style={{ display:'flex', gap:6, alignItems:'center' }}>
-            {SCREENS.slice(1).map((_,i) => (
-              <div key={i} onClick={()=>go(i+1)} style={{
-                width: i+1===idx ? 22 : 8, height:8, borderRadius:4,
-                background: i+1===idx ? T.ink : T.border,
-                cursor:'pointer', transition:'all .3s'
-              }} />
-            ))}
-          </div>
-
-          {idx < SCREENS.length-1
-            ? <button onClick={()=>go(idx+1)} style={{ background: T.ink, color:'#fff', border:'none', borderRadius:100, padding:'9px 26px', fontSize:14, fontWeight:700, cursor:'pointer' }}>Next →</button>
-            : <button onClick={()=>go(0)} style={{ background: T.green, color:'#fff', border:'none', borderRadius:100, padding:'9px 26px', fontSize:14, fontWeight:700, cursor:'pointer' }}>Start Over 🔄</button>
-          }
-        </footer>
-      )}
     </div>
   );
 };
