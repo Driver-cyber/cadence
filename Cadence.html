@@ -2744,7 +2744,11 @@ const GoalsProgress = ({ onGo }) => {
   const totalSaved = goals.reduce((s,g)=>s+g.saved,0);
   const totalTarget = goals.reduce((s,g)=>s+g.target,0);
   const allocatedThisMonth = goals.reduce((s,g)=> s + g.contributions.filter(c=>inThisMonth(c.date)).reduce((t,c)=>t+(Number(c.amount)||0),0), 0);
-  const monthlySurplus = (typeof D.deficit === 'number') ? D.deficit : ((D.income?.total||0) - (D.fixedBills||0) - (D.variableSpend||0));
+  // Live surplus = total monthly income − active bills − monthly transfers (incl. savings).
+  const transfersMonthly = (D.transfers || []).filter(t => !t.paused).reduce((s, t) => s + monthlyEquivalent(t), 0);
+  const monthlyIncome = (D.income?.sources || []).reduce((s, x) => s + (Number(x.amt) || 0), 0);
+  const monthlyBills = (D.fixedBillsList || []).filter(b => !b.paused).reduce((s, b) => s + (Number(b.amount) || 0), 0);
+  const monthlySurplus = Math.round((monthlyIncome - monthlyBills - transfersMonthly) * 100) / 100;
   const remainingToAllocate = Math.round((monthlySurplus - allocatedThisMonth)*100)/100;
 
   const contribute = (id) => {
@@ -2813,7 +2817,7 @@ const GoalsProgress = ({ onGo }) => {
         </div>
         <p style={{ fontSize:13, marginTop:14, opacity: monthlySurplus>=0?.8:1, lineHeight:1.6 }}>
           {monthlySurplus>=0
-            ? 'Income minus fixed bills and variable spending, if the month goes to plan. Make sure This Month shows Billing covered before moving cash to savings.'
+            ? 'Your total monthly income minus your bills and transfers (including what you already move to savings), if the month runs to plan. Make sure This Month shows Billing covered before moving more to savings.'
             : 'Covering the month comes first — see This Month. On any surplus month, send the extra here.'}
         </p>
       </Card>
