@@ -2551,6 +2551,7 @@ const CashFlowTimeline = ({ onGo }) => {
   const today = new Date();
   const [asOfDay, setAsOfDay] = useState(() => Math.min(today.getDate(), D.cycle?.endDay || 30));
   const [monthOffset, setMonthOffset] = useState(0);
+  const [openTile, setOpenTile] = useState(null);
   const isFuture = monthOffset > 0;
   // Chain the projection: each future month opens with the prior month's projected end.
   let _start = Number(D.accounts?.billing) || 0;
@@ -2572,9 +2573,9 @@ const CashFlowTimeline = ({ onGo }) => {
   const kindColor = { income: T.green, bill: T.ink, transfer: T.amber };
   const kindIcon  = { income: '💵', bill: '🧾', transfer: '🔁' };
 
-  const Tile = ({ label, value, color, sub }) => (
-    <div style={{ background: T.card, border:`1px solid ${T.border}`, borderRadius: 14, padding:'14px 16px', flex:'1 1 150px', minWidth: 140 }}>
-      <p style={{ fontSize: 11, color: T.dim, textTransform:'uppercase', letterSpacing:.5, marginBottom: 4 }}>{label}</p>
+  const Tile = ({ label, value, color, sub, onClick, active }) => (
+    <div onClick={onClick} style={{ background: active ? T.greenBg : T.card, border:`1px solid ${active ? T.greenMid : T.border}`, borderRadius: 14, padding:'14px 16px', flex:'1 1 150px', minWidth: 140, cursor: onClick ? 'pointer' : 'default' }}>
+      <p style={{ fontSize: 11, color: T.dim, textTransform:'uppercase', letterSpacing:.5, marginBottom: 4 }}>{label}{onClick && <span style={{ color: T.dim, fontWeight:400 }}> {active ? '▲' : '▼'}</span>}</p>
       <p style={{ fontSize: 22, fontWeight: 800, color: color || T.ink, letterSpacing:-.5 }}>{value}</p>
       {sub && <p style={{ fontSize: 11, color: T.dim, marginTop: 2 }}>{sub}</p>}
     </div>
@@ -2676,13 +2677,32 @@ const CashFlowTimeline = ({ onGo }) => {
       </Card>
 
       {/* TILES */}
-      <div style={{ display:'flex', flexWrap:'wrap', gap: 12, marginBottom: 16 }}>
+      <div style={{ display:'flex', flexWrap:'wrap', gap: 12, marginBottom: 12 }}>
         <Tile label={isFuture ? 'Starts at' : 'Billing now'} value={$$(flow.start)} color={flow.start < 200 ? T.coral : T.ink} sub={isFuture ? 'carried from prior month' : `as of ${dayLabel(asOfDay)}`} />
-        <Tile label="Still coming in" value={`+${$(flow.incomeTotal)}`} color={T.green} sub="paychecks left" />
-        <Tile label="Bills still due" value={$(flow.billTotal)} color={T.ink} sub="from Billing" />
-        <Tile label="Transfers out" value={$(flow.transferTotal)} color={T.amber} sub="to savings / envelope" />
+        <Tile label="Still coming in" value={`+${$(flow.incomeTotal)}`} color={T.green} sub="paychecks left" onClick={()=>setOpenTile(t=>t==='income'?null:'income')} active={openTile==='income'} />
+        <Tile label="Bills still due" value={$(flow.billTotal)} color={T.ink} sub="from Billing" onClick={()=>setOpenTile(t=>t==='bill'?null:'bill')} active={openTile==='bill'} />
+        <Tile label="Transfers out" value={$(flow.transferTotal)} color={T.amber} sub="to savings / envelope" onClick={()=>setOpenTile(t=>t==='transfer'?null:'transfer')} active={openTile==='transfer'} />
         <Tile label="Projected end" value={$$(flow.end)} color={flow.end < 0 ? T.coral : T.green} sub={dayLabel(flow.endDay)} />
       </div>
+      {openTile && (() => {
+        const items = flow.walk.filter(e => e.kind === openTile);
+        const title = openTile==='income' ? 'Paychecks still coming in' : openTile==='bill' ? 'Bills still due' : 'Transfers still going out';
+        return (
+          <Card style={{ marginBottom: 16, background:'#F7F4EE' }}>
+            <p style={{ fontSize:12, fontWeight:800, letterSpacing:.5, textTransform:'uppercase', color:T.dim, marginBottom:8 }}>{title}</p>
+            {items.length===0 && <p style={{ fontSize:13, color:T.dim }}>Nothing left {isFuture?'':'this month'}.</p>}
+            {items.map((e,i) => (
+              <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8, padding:'5px 0', borderBottom:`1px solid ${T.border}` }}>
+                <span style={{ fontSize:13, flex:1, minWidth:0 }}><span style={{ color:T.dim, fontSize:11 }}>{dayLabel(e.day)}</span> · {e.label}</span>
+                <span style={{ fontSize:14, fontWeight:700, color: e.amount>=0?T.green:T.ink }}>{e.amount>=0?'+':'−'}{$$(Math.abs(e.amount)).replace('-','')}</span>
+              </div>
+            ))}
+            <div style={{ display:'flex', justifyContent:'space-between', paddingTop:8, fontWeight:800 }}>
+              <span>Total</span><span>{$$(items.reduce((s,e)=>s+e.amount,0))}</span>
+            </div>
+          </Card>
+        );
+      })()}
 
       {/* THE WALK */}
       <Card style={{ marginBottom: 16 }}>
@@ -2747,6 +2767,7 @@ const GoalsProgress = ({ onGo }) => {
   const [newGoal, setNewGoal] = useState({ name:'', target:'', icon:'🎯' });
   const [accts, setAccts] = useState(() => ({ ...D.accounts }));
   const [payAmt, setPayAmt] = useState({});
+  const [showSurplusBd, setShowSurplusBd] = useState(false);
 
   const DEBTS = [['sapphire','Chase Sapphire','💳'],['ink','Chase Ink','💳'],['apple','Apple Card','🍎'],['heloc','HELOC','🏠']];
   const payDebt = (k, label) => {
@@ -2855,6 +2876,20 @@ const GoalsProgress = ({ onGo }) => {
             ? 'Your total monthly income minus your bills and transfers (including what you already move to savings), if the month runs to plan. Make sure This Month shows Billing covered before moving more to savings.'
             : 'Covering the month comes first — see This Month. On any surplus month, send the extra here.'}
         </p>
+        <button onClick={()=>setShowSurplusBd(v=>!v)} style={{ marginTop:12, background: monthlySurplus>=0?'rgba(255,255,255,0.14)':'#fff', color: monthlySurplus>=0?'#fff':T.ink, border:'none', borderRadius:100, padding:'6px 14px', fontSize:12, fontWeight:700, cursor:'pointer' }}>{showSurplusBd ? '▲ Hide the math' : '▼ What makes this?'}</button>
+        {showSurplusBd && (
+          <div style={{ marginTop:12, paddingTop:12, borderTop:`1px solid ${monthlySurplus>=0 ? 'rgba(255,255,255,0.22)' : T.amberMid}` }}>
+            {[['Monthly income', monthlyIncome, '+', 'incomebills'], ['Active bills', monthlyBills, '−', 'incomebills'], ['Monthly transfers', transfersMonthly, '−', 'transfers']].map(([label, val, sign, dest]) => (
+              <div key={label} onClick={()=>onGo(dest)} style={{ display:'flex', justifyContent:'space-between', padding:'5px 0', fontSize:13, cursor:'pointer' }}>
+                <span style={{ textDecoration:'underline', textDecorationColor: monthlySurplus>=0?'rgba(255,255,255,0.3)':T.border }}>{label} →</span>
+                <span style={{ fontWeight:700 }}>{sign}{$(Math.round(val))}</span>
+              </div>
+            ))}
+            <div style={{ display:'flex', justifyContent:'space-between', paddingTop:8, fontWeight:800, borderTop:`1px solid ${monthlySurplus>=0 ? 'rgba(255,255,255,0.22)' : T.amberMid}`, marginTop:4 }}>
+              <span>Surplus</span><span>{monthlySurplus>=0 ? '' : '−'}{$(Math.abs(Math.round(monthlySurplus)))}/mo</span>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* OVERALL PROGRESS */}
@@ -3304,6 +3339,14 @@ const IncomeBills = () => {
   const lbl = { fontSize:11, color:T.dim, fontWeight:700, marginBottom:3, display:'block' };
   const [incBd, setIncBd] = useState(false);
   const [billBd, setBillBd] = useState(false);
+  const [billFilter, setBillFilter] = useState(null);
+  const [tagInput, setTagInput] = useState({});
+  const SUGGESTED_TAGS = ['subscription','must-have','want','review'];
+  const allBillTags = [...new Set(bills.flatMap(b=>b.tags||[]))].sort();
+  const addTag = (id, tag) => { const t=(tag||'').trim().toLowerCase(); if(!t) return; const b=bills.find(x=>x._id===id); const cur=b.tags||[]; if(cur.includes(t)) return; updBill(id,'tags',[...cur,t]); };
+  const removeTag = (id, tag) => { const b=bills.find(x=>x._id===id); updBill(id,'tags',(b.tags||[]).filter(t=>t!==tag)); };
+  const shownBills = billFilter ? bills.filter(b=>(b.tags||[]).includes(billFilter)) : bills;
+  const filterChip = (on) => ({ background: on?T.ink:'#fff', color: on?'#fff':T.dim, border:`1px solid ${on?T.ink:T.border}`, borderRadius:100, padding:'5px 12px', fontSize:12, fontWeight:700, cursor:'pointer' });
   const jumpTo = (id) => { try { const el = document.getElementById(id); if (el) { el.scrollIntoView({ behavior:'smooth', block:'center' }); el.style.transition='box-shadow .2s'; el.style.boxShadow=`0 0 0 2px ${T.green}`; setTimeout(()=>{ el.style.boxShadow='none'; }, 1400); } } catch {} };
   const breakdown = (rows, total, totalLabel) => (
     <Card style={{ background:'#F7F4EE', marginTop:14, border:`1px solid ${T.border}` }}>
@@ -3362,9 +3405,22 @@ const IncomeBills = () => {
       </>)}
 
       {tab==='bills' && (<>
-        <p style={{ color:T.dim, fontSize:13, marginBottom:14 }}>External bills only — money moved between your own accounts lives on <strong>Transfers</strong>. Set each bill's <strong>day</strong> so the projection knows when it hits.</p>
-        <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:14 }}>
-          {bills.map((b, idx) => (
+        <p style={{ color:T.dim, fontSize:13, marginBottom:12 }}>External bills only — money moved between your own accounts lives on <strong>Transfers</strong>. Tag bills (subscription, must-have, want…) and filter the list.</p>
+        <datalist id="billtags">{[...new Set([...SUGGESTED_TAGS, ...allBillTags])].map(t => <option key={t} value={t} />)}</datalist>
+        {allBillTags.length>0 && (
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:14, alignItems:'center' }}>
+            <span style={{ fontSize:11, color:T.dim, fontWeight:700, textTransform:'uppercase', letterSpacing:.5, marginRight:2 }}>Filter</span>
+            <button onClick={()=>setBillFilter(null)} style={filterChip(billFilter===null)}>All ({bills.length})</button>
+            {allBillTags.map(tag => (
+              <button key={tag} onClick={()=>setBillFilter(f=>f===tag?null:tag)} style={filterChip(billFilter===tag)}>{tag} ({bills.filter(b=>(b.tags||[]).includes(tag)).length})</button>
+            ))}
+          </div>
+        )}
+        <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:14 }}>
+          {shownBills.length===0 && <p style={{ fontSize:13, color:T.dim, padding:'12px 0' }}>No bills tagged “{billFilter}”.</p>}
+          {shownBills.map((b) => {
+            const idx = bills.findIndex(x=>x._id===b._id);
+            return (
             <div key={b._id} id={'bill-'+b._id}>
               <EditableRow idx={idx} total={bills.length}
                 onUp={()=>moveBill(b._id,-1)} onDown={()=>moveBill(b._id,1)} onDelete={()=>rmBill(b._id)}
@@ -3374,8 +3430,16 @@ const IncomeBills = () => {
                 amountValue={b.amount} onAmountChange={v=>updBill(b._id,'amount',v)}
                 dayValue={b.day} onDayChange={v=>updBill(b._id,'day',v)}
                 paused={!!b.paused} onTogglePause={()=>updBill(b._id,'paused',!b.paused)} />
+              <div style={{ display:'flex', flexWrap:'wrap', gap:6, alignItems:'center', padding:'6px 4px 0' }}>
+                {(b.tags||[]).map(t => (
+                  <span key={t} onClick={()=>removeTag(b._id,t)} title="tap to remove" style={{ background:T.greenBg, color:T.green, border:`1px solid ${T.greenMid}`, borderRadius:100, padding:'2px 9px', fontSize:11, fontWeight:700, cursor:'pointer' }}>{t} ✕</span>
+                ))}
+                <input list="billtags" value={tagInput[b._id]||''} onChange={e=>setTagInput(m=>({ ...m, [b._id]: e.target.value }))}
+                  onKeyDown={e=>{ if(e.key==='Enter'){ addTag(b._id, e.target.value); setTagInput(m=>({ ...m, [b._id]: '' })); } }}
+                  placeholder="+ tag (Enter)" style={{ width:120, border:`1px dashed ${T.border}`, borderRadius:100, padding:'3px 11px', fontSize:11, outline:'none', fontFamily:'inherit', color:T.ink }} />
+              </div>
             </div>
-          ))}
+          );})}
         </div>
         <button onClick={addBill} style={{ background:T.greenBg, color:T.green, border:`1px solid ${T.greenMid}`, borderRadius:12, padding:'11px 20px', fontSize:14, fontWeight:700, cursor:'pointer' }}>+ Add bill</button>
         <div style={{ marginTop:16 }}>
