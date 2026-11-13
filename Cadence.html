@@ -505,8 +505,8 @@ const monthsAhead = (n) => {
 };
 
 // ─── SHARED UI ────────────────────────────────────────────────────────────────
-const Card = ({ children, style }) => (
-  <div style={{ background: T.card, borderRadius: 16, border: `1px solid ${T.border}`, padding: 24, ...style }}>{children}</div>
+const Card = ({ children, style, ...rest }) => (
+  <div style={{ background: T.card, borderRadius: 16, border: `1px solid ${T.border}`, padding: 24, ...style }} {...rest}>{children}</div>
 );
 
 const Tag = ({ children, color = 'green' }) => {
@@ -3020,6 +3020,10 @@ const Transfers = ({ onGo }) => {
   const narrow = useIsNarrow();
   const [transfers, setTransfers] = useState(() => (D.transfers || []).map((t,i)=>({ ...t, _id: t.id || `t_${i}` })));
   const [editId, setEditId] = useState(null);
+  const [showBd, setShowBd] = useState(false);
+  const jumpTo = (id) => { try { const el = document.getElementById(id); if (el) { el.scrollIntoView({ behavior:'smooth', block:'center' }); el.style.transition='box-shadow .2s'; el.style.boxShadow=`0 0 0 2px ${T.amber}`; setTimeout(()=>{ el.style.boxShadow='none'; }, 1400); } } catch {} };
+  // How a transfer's rate rolls up to a monthly figure, in words.
+  const rollup = (t) => t.cadence==='weekly' ? `${$(t.amount)}/wk × 4.33` : t.cadence==='semimonthly' ? `${$(t.amount)} × ${(t.days||[15,30]).filter(x=>x!=null).length}/mo` : `${$(t.amount)}/mo`;
 
   const persist = (next) => {
     setTransfers(next);
@@ -3114,10 +3118,25 @@ const Transfers = ({ onGo }) => {
           title="Transfers" sub="Money you move out of Billing into your own accounts — spending envelopes and savings you're building up." />
       </div>
       <Card style={{ background:T.amberBg, border:`1px solid ${T.amberMid}`, marginBottom:16 }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <span style={{ fontWeight:700 }}>Moving out of Billing each month</span>
+        <div onClick={()=>setShowBd(v=>!v)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer' }}>
+          <span style={{ fontWeight:700 }}>Moving out of Billing each month <span style={{ color:T.amber, fontSize:13 }}>{showBd ? '▲' : '▼ what’s this?'}</span></span>
           <span style={{ fontSize:24, fontWeight:800, color:T.amber }}>{$(Math.round(monthlyOut))}/mo</span>
         </div>
+        {showBd && (
+          <div style={{ marginTop:12, paddingTop:12, borderTop:`1px solid ${T.amberMid}` }}>
+            {transfers.filter(t=>!t.paused).map(t => (
+              <div key={t._id} onClick={()=>jumpTo('tr-'+t._id)} style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8, padding:'6px 0', borderBottom:`1px solid ${T.amberMid}`, cursor:'pointer' }}>
+                <span style={{ fontSize:13, color:T.ink, flex:1, minWidth:0 }}>{t.label} <span style={{ color:T.dim, fontSize:11 }}>({rollup(t)})</span></span>
+                <span style={{ fontSize:14, fontWeight:700, color:T.ink }}>{$(Math.round(monthlyEquivalent(t)))}/mo</span>
+              </div>
+            ))}
+            <div style={{ display:'flex', justifyContent:'space-between', paddingTop:8 }}>
+              <span style={{ fontWeight:800 }}>Total each month</span>
+              <span style={{ fontWeight:800, color:T.amber }}>{$(Math.round(monthlyOut))}/mo</span>
+            </div>
+            <p style={{ fontSize:11, color:T.dim, marginTop:8, lineHeight:1.5 }}>Weekly transfers are averaged at 4.33 weeks/month for this estimate. The actual <strong>This Month</strong> projection counts the real days (e.g. a 4-Friday month = {$(510*4)} grocery). Tap a line to jump to it.</p>
+          </div>
+        )}
       </Card>
 
       {/* SINKING FUNDS & SAVINGS */}
@@ -3128,7 +3147,7 @@ const Transfers = ({ onGo }) => {
           const st = fundStatus(D, t);
           const editing = editId===t._id;
           return (
-            <Card key={t._id} style={{ border:`1px solid ${st && st.dated && !st.onTrack ? T.coralMid : T.border}` }}>
+            <Card key={t._id} id={'tr-'+t._id} style={{ border:`1px solid ${st && st.dated && !st.onTrack ? T.coralMid : T.border}` }}>
               <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
                 <span style={{ fontSize:22 }}>{st && st.dated ? '📅' : '🎯'}</span>
                 <div style={{ flex:'1 1 150px', minWidth:0 }}>
@@ -3162,7 +3181,7 @@ const Transfers = ({ onGo }) => {
         {plain.map(t => {
           const editing = editId===t._id;
           return (
-            <Card key={t._id} style={{ padding:'14px 16px' }}>
+            <Card key={t._id} id={'tr-'+t._id} style={{ padding:'14px 16px' }}>
               <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
                 <span style={{ fontSize:20 }}>🔁</span>
                 <div style={{ flex:'1 1 140px', minWidth:0 }}>
@@ -3283,6 +3302,24 @@ const IncomeBills = () => {
   const billsTotal = bills.filter(b=>!b.paused).reduce((s,b)=>s+(Number(b.amount)||0),0);
   const field = { border:`1px solid ${T.border}`, borderRadius:10, padding:'9px 12px', fontSize:14, fontFamily:'inherit', outline:'none', background:'#fff', color:T.ink, width:'100%' };
   const lbl = { fontSize:11, color:T.dim, fontWeight:700, marginBottom:3, display:'block' };
+  const [incBd, setIncBd] = useState(false);
+  const [billBd, setBillBd] = useState(false);
+  const jumpTo = (id) => { try { const el = document.getElementById(id); if (el) { el.scrollIntoView({ behavior:'smooth', block:'center' }); el.style.transition='box-shadow .2s'; el.style.boxShadow=`0 0 0 2px ${T.green}`; setTimeout(()=>{ el.style.boxShadow='none'; }, 1400); } } catch {} };
+  const breakdown = (rows, total, totalLabel) => (
+    <Card style={{ background:'#F7F4EE', marginTop:14, border:`1px solid ${T.border}` }}>
+      <p style={{ fontSize:12, fontWeight:800, letterSpacing:.5, textTransform:'uppercase', color:T.dim, marginBottom:8 }}>What makes {$(Math.round(total))}</p>
+      {rows.map(r => (
+        <div key={r.id} onClick={()=>jumpTo(r.id)} style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8, padding:'6px 0', borderBottom:`1px solid ${T.border}`, cursor:'pointer' }}>
+          <span style={{ fontSize:13, flex:1, minWidth:0, color: r.muted?T.dim:T.ink }}>{r.label}{r.tag?<span style={{ fontSize:11, color:T.amber }}> · {r.tag}</span>:''}</span>
+          <span style={{ fontSize:14, fontWeight:700, color: r.muted?T.dim:T.ink }}>{r.muted?'—':$$(r.amt)}</span>
+        </div>
+      ))}
+      <div style={{ display:'flex', justifyContent:'space-between', paddingTop:8 }}>
+        <span style={{ fontWeight:800 }}>{totalLabel}</span><span style={{ fontWeight:800, color:T.green }}>{$(Math.round(total))}</span>
+      </div>
+      <p style={{ fontSize:11, color:T.dim, marginTop:6 }}>Tap any line to jump to where you edit it.</p>
+    </Card>
+  );
 
   return (
     <div style={{ padding:'clamp(20px,5vw,32px) clamp(16px,5vw,48px)', maxWidth:860, margin:'0 auto' }}>
@@ -3296,7 +3333,7 @@ const IncomeBills = () => {
       {tab==='income' && (<>
         <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:14 }}>
           {sources.map(s => (
-            <Card key={s._id} style={{ padding:'14px 16px' }}>
+            <Card key={s._id} id={'inc-'+s._id} style={{ padding:'14px 16px' }}>
               <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:10, marginBottom:10 }}>
                 <div><span style={lbl}>Source name</span><input value={s.label} onChange={e=>updSource(s._id,'label',e.target.value)} style={field} /></div>
                 <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
@@ -3318,23 +3355,33 @@ const IncomeBills = () => {
           ))}
         </div>
         <button onClick={addSource} style={{ background:T.greenBg, color:T.green, border:`1px solid ${T.greenMid}`, borderRadius:12, padding:'11px 20px', fontSize:14, fontWeight:700, cursor:'pointer' }}>+ Add income source</button>
+        <div style={{ marginTop:16 }}>
+          <button onClick={()=>setIncBd(v=>!v)} style={{ background:'none', border:'none', color:T.dim, fontSize:13, fontWeight:700, cursor:'pointer', padding:0 }}>{incBd?'▲ Hide the math':`▼ What makes ${$(incomeTotal)}/mo?`}</button>
+          {incBd && breakdown(sources.map(s=>({ id:'inc-'+s._id, label:s.label||'Income', amt:Number(s.amt)||0, tag: s.allocate?'allocate only':(s.when||'') })), incomeTotal, 'Total income')}
+        </div>
       </>)}
 
       {tab==='bills' && (<>
         <p style={{ color:T.dim, fontSize:13, marginBottom:14 }}>External bills only — money moved between your own accounts lives on <strong>Transfers</strong>. Set each bill's <strong>day</strong> so the projection knows when it hits.</p>
         <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:14 }}>
           {bills.map((b, idx) => (
-            <EditableRow key={b._id} idx={idx} total={bills.length}
-              onUp={()=>moveBill(b._id,-1)} onDown={()=>moveBill(b._id,1)} onDelete={()=>rmBill(b._id)}
-              T={T} fieldStyle={field}
-              nameValue={b.name} onNameChange={v=>updBill(b._id,'name',v)} namePlaceholder="Bill name"
-              noteValue={b.note} onNoteChange={v=>updBill(b._id,'note',v)} notePlaceholder="Due date / notes"
-              amountValue={b.amount} onAmountChange={v=>updBill(b._id,'amount',v)}
-              dayValue={b.day} onDayChange={v=>updBill(b._id,'day',v)}
-              paused={!!b.paused} onTogglePause={()=>updBill(b._id,'paused',!b.paused)} />
+            <div key={b._id} id={'bill-'+b._id}>
+              <EditableRow idx={idx} total={bills.length}
+                onUp={()=>moveBill(b._id,-1)} onDown={()=>moveBill(b._id,1)} onDelete={()=>rmBill(b._id)}
+                T={T} fieldStyle={field}
+                nameValue={b.name} onNameChange={v=>updBill(b._id,'name',v)} namePlaceholder="Bill name"
+                noteValue={b.note} onNoteChange={v=>updBill(b._id,'note',v)} notePlaceholder="Due date / notes"
+                amountValue={b.amount} onAmountChange={v=>updBill(b._id,'amount',v)}
+                dayValue={b.day} onDayChange={v=>updBill(b._id,'day',v)}
+                paused={!!b.paused} onTogglePause={()=>updBill(b._id,'paused',!b.paused)} />
+            </div>
           ))}
         </div>
         <button onClick={addBill} style={{ background:T.greenBg, color:T.green, border:`1px solid ${T.greenMid}`, borderRadius:12, padding:'11px 20px', fontSize:14, fontWeight:700, cursor:'pointer' }}>+ Add bill</button>
+        <div style={{ marginTop:16 }}>
+          <button onClick={()=>setBillBd(v=>!v)} style={{ background:'none', border:'none', color:T.dim, fontSize:13, fontWeight:700, cursor:'pointer', padding:0 }}>{billBd?'▲ Hide the math':`▼ What makes ${$(Math.round(billsTotal))}/mo?`}</button>
+          {billBd && breakdown(bills.map(b=>({ id:'bill-'+b._id, label:b.name||'Bill', amt:Number(b.amount)||0, muted:!!b.paused, tag: b.paused?'paused':(b.day?`day ${b.day}`:'') })), billsTotal, 'Total active bills')}
+        </div>
       </>)}
     </div>
   );
