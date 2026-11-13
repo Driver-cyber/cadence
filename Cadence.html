@@ -3115,7 +3115,7 @@ const Transfers = ({ onGo }) => {
                   </div>
                 </div>
               )}
-              {editing && <Editor t={t} />}
+              {editing && Editor({ t })}
             </Card>
           );
         })}
@@ -3134,10 +3134,10 @@ const Transfers = ({ onGo }) => {
                   <p style={{ fontWeight:700, fontSize:14 }}>{t.label}</p>
                   <p style={{ fontSize:12, color:T.dim }}>→ {acctLabel(t.to)} · {cadenceDesc(t)}</p>
                 </div>
-                <AmountRow t={t} />
+                {AmountRow({ t })}
                 <button onClick={()=>setEditId(editing?null:t._id)} style={{ background:'none', border:`1px solid ${T.border}`, borderRadius:10, padding:'6px 12px', fontSize:12, cursor:'pointer', color:T.dim, fontWeight:700 }}>{editing?'Close':'Edit'}</button>
               </div>
-              {editing && <Editor t={t} />}
+              {editing && Editor({ t })}
             </Card>
           );
         })}
@@ -3200,20 +3200,20 @@ const Today = ({ onGo }) => {
 
       <p style={{ fontSize:12, fontWeight:800, letterSpacing:1, textTransform:'uppercase', color:T.dim, marginBottom:10 }}>Savings &amp; other accounts</p>
       <Card style={{ marginBottom:16 }}>
-        <Row k="groceries" label="Groceries (Grosh)" />
-        <Row k="propertyTax" label="Property Tax savings" />
-        <Row k="emergency" label="E-Save (emergency)" />
-        <Row k="baselane" label="Baselane (rental)" />
-        <Row k="opFunSavings" label="OP Fun Savings" />
-        <Row k="personalClearing" label="Personal Clearing" />
+        {Row({ k:'groceries', label:'Groceries (Grosh)' })}
+        {Row({ k:'propertyTax', label:'Property Tax savings' })}
+        {Row({ k:'emergency', label:'E-Save (emergency)' })}
+        {Row({ k:'baselane', label:'Baselane (rental)' })}
+        {Row({ k:'opFunSavings', label:'OP Fun Savings' })}
+        {Row({ k:'personalClearing', label:'Personal Clearing' })}
       </Card>
 
       <p style={{ fontSize:12, fontWeight:800, letterSpacing:1, textTransform:'uppercase', color:T.dim, marginBottom:10 }}>Cards &amp; loans</p>
       <Card style={{ marginBottom:16 }}>
-        <Row k="sapphire" label="Chase Sapphire (2575)" />
-        <Row k="ink" label="Chase Ink (0388)" />
-        <Row k="apple" label="Apple Card" />
-        <Row k="heloc" label="HELOC" />
+        {Row({ k:'sapphire', label:'Chase Sapphire (2575)' })}
+        {Row({ k:'ink', label:'Chase Ink (0388)' })}
+        {Row({ k:'apple', label:'Apple Card' })}
+        {Row({ k:'heloc', label:'HELOC' })}
       </Card>
 
       <Card style={{ background:T.greenBg, border:`1px solid ${T.greenMid}` }}>
