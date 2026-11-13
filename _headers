@@ -1,0 +1,8 @@
+# Always revalidate the app shell so deploys show up on a normal reload
+# (no-cache = may store, but must check with the server before using the cache).
+/
+  Cache-Control: no-cache
+/Cadence.html
+  Cache-Control: no-cache
+/site.webmanifest
+  Cache-Control: no-cache
