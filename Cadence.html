@@ -2394,6 +2394,15 @@ const monthlyEquivalent = (m) => {
   return a;
 };
 
+// Actual number of times a movement occurs in the CURRENT cycle (real calendar,
+// so a 5-Friday month counts 5). offset lets callers ask about a future month.
+const occurrencesThisMonth = (D, m, offset = 0) => {
+  const c = monthCycle(D, offset);
+  return expandMovement({ cadence: m.cadence || 'monthly', day: m.day, weekday: m.weekday, days: m.days }, 1, c.endDay, { year: c.year, month: c.month }).length;
+};
+// A transfer's actual dollar total for this cycle (real occurrences × amount).
+const transferActual = (D, t, offset = 0) => occurrencesThisMonth(D, t, offset) * (Number(t.amount) || 0);
+
 // Cycle info for `offset` months from D's base cycle (0 = this month, 1 = next…).
 const monthCycle = (D, offset) => {
   const b = cycleBase(D);
@@ -2801,7 +2810,7 @@ const GoalsProgress = ({ onGo }) => {
   const totalTarget = goals.reduce((s,g)=>s+g.target,0);
   const allocatedThisMonth = goals.reduce((s,g)=> s + g.contributions.filter(c=>inThisMonth(c.date)).reduce((t,c)=>t+(Number(c.amount)||0),0), 0);
   // Live surplus = total monthly income − active bills − monthly transfers (incl. savings).
-  const transfersMonthly = (D.transfers || []).filter(t => !t.paused).reduce((s, t) => s + monthlyEquivalent(t), 0);
+  const transfersMonthly = (D.transfers || []).filter(t => !t.paused).reduce((s, t) => s + transferActual(D, t), 0);
   const monthlyIncome = (D.income?.sources || []).reduce((s, x) => s + (Number(x.amt) || 0), 0);
   const monthlyBills = (D.fixedBillsList || []).filter(b => !b.paused).reduce((s, b) => s + (Number(b.amount) || 0), 0);
   const monthlySurplus = Math.round((monthlyIncome - monthlyBills - transfersMonthly) * 100) / 100;
@@ -3058,7 +3067,7 @@ const Transfers = ({ onGo }) => {
   const [showBd, setShowBd] = useState(false);
   const jumpTo = (id) => { try { const el = document.getElementById(id); if (el) { el.scrollIntoView({ behavior:'smooth', block:'center' }); el.style.transition='box-shadow .2s'; el.style.boxShadow=`0 0 0 2px ${T.amber}`; setTimeout(()=>{ el.style.boxShadow='none'; }, 1400); } } catch {} };
   // How a transfer's rate rolls up to a monthly figure, in words.
-  const rollup = (t) => t.cadence==='weekly' ? `${$(t.amount)}/wk × 4.33` : t.cadence==='semimonthly' ? `${$(t.amount)} × ${(t.days||[15,30]).filter(x=>x!=null).length}/mo` : `${$(t.amount)}/mo`;
+  const rollup = (t) => { const n = occurrencesThisMonth(D, t); return t.cadence==='weekly' ? `${$(t.amount)}/wk × ${n} this month` : t.cadence==='semimonthly' ? `${$(t.amount)} × ${n}/mo` : `${$(t.amount)}/mo`; };
 
   const persist = (next) => {
     setTransfers(next);
@@ -3079,7 +3088,7 @@ const Transfers = ({ onGo }) => {
   const cadenceDesc = (t) => t.cadence==='weekly' ? `every ${WEEKDAYS[t.weekday ?? 5]}` : t.cadence==='semimonthly' ? `twice monthly (${(t.days||[15,30]).filter(x=>x!=null).join(' & ')})` : 'monthly';
   const perLabel = (t) => t.cadence==='weekly' ? '/wk' : t.cadence==='semimonthly' ? ' ea' : '/mo';
   const fmtMonth = (iso) => { try { return new Date(iso+'T12:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'}); } catch { return iso; } };
-  const monthlyOut = transfers.filter(t=>!t.paused).reduce((s,t)=> s + monthlyEquivalent(t), 0);
+  const monthlyOut = transfers.filter(t=>!t.paused).reduce((s,t)=> s + transferActual(D, t), 0);
 
   const funds = transfers.filter(t => t.fund);
   const plain = transfers.filter(t => !t.fund);
@@ -3154,7 +3163,7 @@ const Transfers = ({ onGo }) => {
       </div>
       <Card style={{ background:T.amberBg, border:`1px solid ${T.amberMid}`, marginBottom:16 }}>
         <div onClick={()=>setShowBd(v=>!v)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer' }}>
-          <span style={{ fontWeight:700 }}>Moving out of Billing each month <span style={{ color:T.amber, fontSize:13 }}>{showBd ? '▲' : '▼ what’s this?'}</span></span>
+          <span style={{ fontWeight:700 }}>Moving out of Billing this month <span style={{ color:T.amber, fontSize:13 }}>{showBd ? '▲' : '▼ what’s this?'}</span></span>
           <span style={{ fontSize:24, fontWeight:800, color:T.amber }}>{$(Math.round(monthlyOut))}/mo</span>
         </div>
         {showBd && (
@@ -3162,14 +3171,14 @@ const Transfers = ({ onGo }) => {
             {transfers.filter(t=>!t.paused).map(t => (
               <div key={t._id} onClick={()=>jumpTo('tr-'+t._id)} style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8, padding:'6px 0', borderBottom:`1px solid ${T.amberMid}`, cursor:'pointer' }}>
                 <span style={{ fontSize:13, color:T.ink, flex:1, minWidth:0 }}>{t.label} <span style={{ color:T.dim, fontSize:11 }}>({rollup(t)})</span></span>
-                <span style={{ fontSize:14, fontWeight:700, color:T.ink }}>{$(Math.round(monthlyEquivalent(t)))}/mo</span>
+                <span style={{ fontSize:14, fontWeight:700, color:T.ink }}>{$(Math.round(transferActual(D, t)))}</span>
               </div>
             ))}
             <div style={{ display:'flex', justifyContent:'space-between', paddingTop:8 }}>
-              <span style={{ fontWeight:800 }}>Total each month</span>
+              <span style={{ fontWeight:800 }}>Total this month</span>
               <span style={{ fontWeight:800, color:T.amber }}>{$(Math.round(monthlyOut))}/mo</span>
             </div>
-            <p style={{ fontSize:11, color:T.dim, marginTop:8, lineHeight:1.5 }}>Weekly transfers are averaged at 4.33 weeks/month for this estimate. The actual <strong>This Month</strong> projection counts the real days (e.g. a 4-Friday month = {$(510*4)} grocery). Tap a line to jump to it.</p>
+            <p style={{ fontSize:11, color:T.dim, marginTop:8, lineHeight:1.5 }}>Uses the <strong>actual</strong> count of each transfer in {D.cycle?.label || 'this month'} — so a 5-Friday month shows 5 grocery transfers, not an average. Matches the This Month projection. Tap a line to jump to it.</p>
           </div>
         )}
       </Card>
